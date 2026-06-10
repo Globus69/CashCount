@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CashCount">
+  <meta name="theme-color" content="#0f766e">
+  <title>CashCount</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <!-- Bestand -->
+  <header class="balance" id="balance">
+    <span class="balance__label">Aktueller Bestand</span>
+    <span class="balance__value" id="balanceValue">–</span>
+    <span class="balance__sub" id="balanceSub"></span>
+  </header>
+
+  <main id="views">
+    <!-- ERFASSEN -->
+    <section class="view" data-view="capture">
+      <form id="captureForm" class="capture" autocomplete="off">
+        <div class="amount">
+          <input id="amountInput" class="amount__input" inputmode="decimal" placeholder="0,00" aria-label="Betrag">
+          <span class="amount__cur">€</span>
+        </div>
+
+        <div class="typetoggle" id="captureType">
+          <button type="button" class="typebtn" data-type="expense">Ausgabe</button>
+          <button type="button" class="typebtn" data-type="income">Einnahme</button>
+        </div>
+
+        <div class="chips" id="captureChips"></div>
+
+        <div class="row">
+          <input type="date" id="dateInput" class="field" aria-label="Datum">
+        </div>
+        <div class="row">
+          <input type="text" id="noteInput" class="field" placeholder="Notiz (optional)">
+        </div>
+
+        <button type="submit" class="save" id="saveBtn">Speichern</button>
+        <p class="toast" id="toast" hidden></p>
+      </form>
+    </section>
+
+    <!-- VERLAUF -->
+    <section class="view" data-view="history" hidden>
+      <div class="filterbar">
+        <input id="searchInput" class="field" placeholder="🔍 Suche (Notiz / Kategorie)">
+        <div class="row">
+          <select id="filterType" class="field">
+            <option value="all">Alle</option>
+            <option value="expense">Ausgaben</option>
+            <option value="income">Einnahmen</option>
+          </select>
+          <select id="filterCat" class="field"></select>
+        </div>
+      </div>
+      <div id="historyList"></div>
+    </section>
+
+    <!-- MEHR -->
+    <section class="view" data-view="more" hidden>
+      <div class="card">
+        <h2>Übersicht — <span id="statMonth"></span></h2>
+        <div class="statrow"><span>Einnahmen</span><span class="pos" id="statIncome">–</span></div>
+        <div class="statrow"><span>Ausgaben</span><span class="neg" id="statExpense">–</span></div>
+        <div class="statrow statrow--total"><span>Saldo Monat</span><span id="statNet">–</span></div>
+        <div id="statByCat" class="statcats"></div>
+      </div>
+
+      <div class="card">
+        <h2>Anfangsbestand</h2>
+        <div class="row">
+          <input id="startInput" class="field" inputmode="decimal" placeholder="0,00">
+          <button type="button" class="btn" id="saveStartBtn">Sichern</button>
+        </div>
+        <p class="muted" id="startMode"></p>
+      </div>
+
+      <div class="card">
+        <div class="card__head">
+          <h2>Kategorien</h2>
+          <button type="button" class="btn btn--sm" id="addCatBtn">+ Neu</button>
+        </div>
+        <div id="categoryListMore" class="catlist"></div>
+      </div>
+
+      <div class="card">
+        <div class="card__head">
+          <h2>Wiederkehrende Einträge</h2>
+          <button type="button" class="btn btn--sm" id="addRecurBtn">+ Neu</button>
+        </div>
+        <div id="recurringList" class="catlist"></div>
+        <p class="muted">Fällige Einträge werden beim Öffnen der App automatisch erzeugt.</p>
+      </div>
+
+      <div class="card">
+        <h2>Daten</h2>
+        <div class="datagrid">
+          <button type="button" class="btn" id="exportCsvBtn">CSV exportieren</button>
+          <button type="button" class="btn" id="backupBtn">Backup sichern</button>
+          <button type="button" class="btn" id="importBtn">Backup laden</button>
+          <input type="file" id="importFile" accept="application/json,.json" hidden>
+        </div>
+        <p class="muted">CSV für Tabellen (Excel/Numbers). „Backup laden" ersetzt alle aktuellen Daten.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Bottom-Navigation -->
+  <nav class="tabbar">
+    <button class="tab is-active" data-goto="capture">➕<span>Erfassen</span></button>
+    <button class="tab" data-goto="history">📒<span>Verlauf</span></button>
+    <button class="tab" data-goto="more">⚙️<span>Mehr</span></button>
+  </nav>
+
+  <!-- Bearbeiten-Overlay -->
+  <div class="overlay" id="editOverlay" hidden>
+    <div class="sheet">
+      <h2>Eintrag bearbeiten</h2>
+      <div class="amount">
+        <input id="editAmount" class="amount__input" inputmode="decimal" placeholder="0,00">
+        <span class="amount__cur">€</span>
+      </div>
+      <div class="typetoggle" id="editType">
+        <button type="button" class="typebtn" data-type="expense">Ausgabe</button>
+        <button type="button" class="typebtn" data-type="income">Einnahme</button>
+      </div>
+      <div class="chips" id="editChips"></div>
+      <div class="row"><input type="date" id="editDate" class="field"></div>
+      <div class="row"><input type="text" id="editNote" class="field" placeholder="Notiz (optional)"></div>
+      <div class="sheet__actions">
+        <button type="button" class="btn danger" id="editDelete">Löschen</button>
+        <button type="button" class="btn" id="editCancel">Abbrechen</button>
+        <button type="button" class="save save--inline" id="editSave">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kategorie-Overlay -->
+  <div class="overlay" id="catOverlay" hidden>
+    <div class="sheet">
+      <h2 id="catSheetTitle">Kategorie</h2>
+      <div class="row">
+        <input id="catIcon" class="field field--icon" placeholder="🛒" maxlength="2" aria-label="Emoji">
+        <input id="catName" class="field" placeholder="Name" aria-label="Name">
+      </div>
+      <div class="swatches" id="catSwatches"></div>
+      <select id="catType" class="field">
+        <option value="expense">Ausgabe</option>
+        <option value="income">Einnahme</option>
+        <option value="both">beides</option>
+      </select>
+      <label class="check"><input type="checkbox" id="catArchived"> Archiviert (ausgeblendet)</label>
+      <div class="sheet__actions">
+        <button type="button" class="btn danger" id="catDelete">Löschen</button>
+        <button type="button" class="btn" id="catCancel">Abbrechen</button>
+        <button type="button" class="save save--inline" id="catSave">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wiederkehrend-Overlay -->
+  <div class="overlay" id="recurOverlay" hidden>
+    <div class="sheet">
+      <h2>Wiederkehrender Eintrag</h2>
+      <div class="amount">
+        <input id="recurAmount" class="amount__input" inputmode="decimal" placeholder="0,00">
+        <span class="amount__cur">€</span>
+      </div>
+      <div class="typetoggle" id="recurType">
+        <button type="button" class="typebtn" data-type="expense">Ausgabe</button>
+        <button type="button" class="typebtn" data-type="income">Einnahme</button>
+      </div>
+      <div class="chips" id="recurChips"></div>
+      <input id="recurNote" class="field" placeholder="Notiz (optional)">
+      <label class="fieldlabel">Intervall
+        <select id="recurInterval" class="field"></select>
+      </label>
+      <label class="fieldlabel" id="recurWeekdayRow" hidden>Wochentag
+        <select id="recurWeekday" class="field"></select>
+      </label>
+      <label class="fieldlabel" id="recurDayRow" hidden>Tag im Monat
+        <input id="recurDay" class="field" inputmode="numeric" placeholder="1–31">
+      </label>
+      <label class="fieldlabel">Start
+        <input type="date" id="recurStart" class="field">
+      </label>
+      <label class="fieldlabel">Ende (optional)
+        <input type="date" id="recurEnd" class="field">
+      </label>
+      <label class="check"><input type="checkbox" id="recurActive" checked> Aktiv</label>
+      <div class="sheet__actions">
+        <button type="button" class="btn danger" id="recurDelete">Löschen</button>
+        <button type="button" class="btn" id="recurCancel">Abbrechen</button>
+        <button type="button" class="save save--inline" id="recurSave">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/money.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/exporter.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

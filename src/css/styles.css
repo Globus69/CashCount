@@ -1,0 +1,199 @@
+/* CashCount — Styles. Dark, daumenfreundlich, Vollbild-PWA. */
+:root {
+  --bg: #0b1220;
+  --surface: #111a2e;
+  --surface2: #1a2540;
+  --text: #e6edf6;
+  --muted: #8a97ad;
+  --accent: #0f766e;
+  --expense: #ef4444;
+  --income: #22c55e;
+  --tap: 56px;
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; height: 100%;
+  background: var(--bg); color: var(--text);
+  font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+}
+body { display: flex; flex-direction: column; min-height: 100dvh; }
+
+/* Bestand */
+.balance {
+  padding: calc(var(--safe-top) + 16px) 16px 18px;
+  text-align: center;
+  background: linear-gradient(180deg, var(--accent), transparent);
+}
+.balance__label { display: block; font-size: 14px; color: rgba(255,255,255,.8); }
+.balance__value { display: block; font-size: 42px; font-weight: 700; letter-spacing: -.5px; }
+.balance__value.is-negative { color: var(--expense); }
+.balance__sub { display: block; font-size: 12px; color: rgba(255,255,255,.6); margin-top: 2px; }
+
+main { flex: 1; overflow-y: auto; padding: 16px; }
+.view[hidden] { display: none; }
+.placeholder { color: var(--muted); text-align: center; margin-top: 40px; }
+.muted { color: var(--muted); font-size: 13px; }
+
+/* Erfassen */
+.capture { display: flex; flex-direction: column; gap: 14px; }
+.amount {
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface); border-radius: 16px; padding: 14px;
+}
+.amount__input {
+  background: transparent; border: 0; color: var(--text);
+  font-size: 44px; font-weight: 700; text-align: right; width: 100%;
+  outline: none; min-width: 0;
+}
+.amount__cur { font-size: 32px; color: var(--muted); padding-left: 8px; }
+
+.typetoggle { display: flex; gap: 8px; }
+.typebtn {
+  flex: 1; min-height: var(--tap); border: 1px solid #243152;
+  background: var(--surface); color: var(--muted);
+  border-radius: 12px; font-size: 16px; font-weight: 600;
+}
+.typebtn[data-type="expense"].is-active { background: var(--expense); color: #fff; border-color: var(--expense); }
+.typebtn[data-type="income"].is-active  { background: var(--income);  color: #06210f; border-color: var(--income); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 44px; padding: 8px 14px; border-radius: 999px;
+  border: 1px solid #243152; background: var(--surface);
+  color: var(--text); font-size: 15px;
+}
+.chip.is-active { border-color: var(--chip, var(--accent)); box-shadow: inset 0 0 0 1px var(--chip, var(--accent)); }
+.chip__icon { font-size: 18px; }
+
+.row { display: flex; gap: 8px; }
+.field {
+  flex: 1; min-height: var(--tap); padding: 0 14px;
+  background: var(--surface); border: 1px solid #243152; border-radius: 12px;
+  color: var(--text); font-size: 16px; outline: none;
+}
+input[type="date"].field { color-scheme: dark; }
+
+.save {
+  min-height: var(--tap); border: 0; border-radius: 14px;
+  background: var(--accent); color: #fff; font-size: 18px; font-weight: 700;
+}
+.save--inline { flex: 1; }
+
+.toast {
+  text-align: center; color: var(--income); font-weight: 600; margin: 4px 0 0;
+}
+
+/* Buttons allgemein */
+.btn {
+  min-height: var(--tap); padding: 0 18px; border-radius: 12px;
+  border: 1px solid #243152; background: var(--surface2); color: var(--text);
+  font-size: 16px; font-weight: 600;
+}
+.btn.danger { background: transparent; color: var(--expense); border-color: var(--expense); }
+
+/* Verlauf */
+.dayhead {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin: 18px 2px 8px; font-size: 13px; color: var(--muted); font-weight: 600;
+}
+.dayhead .pos { color: var(--income); }
+.dayhead .neg { color: var(--expense); }
+.entry {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  text-align: left; background: var(--surface); border: 0;
+  border-radius: 12px; padding: 12px; margin-bottom: 8px; color: var(--text);
+}
+.entry__icon {
+  width: 38px; height: 38px; flex: 0 0 38px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+  background: color-mix(in srgb, var(--chip) 25%, transparent);
+}
+.entry__main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.entry__cat { font-size: 16px; }
+.entry__note { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entry__amount { font-weight: 700; font-size: 16px; }
+.entry__amount.pos { color: var(--income); }
+.entry__amount.neg { color: var(--expense); }
+
+.entry__rec { font-size: 11px; position: relative; top: -8px; margin-left: -4px; }
+
+/* Mehr / Karten */
+.card { background: var(--surface); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+.card h2 { margin: 0 0 12px; font-size: 17px; }
+.card__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.card__head h2 { margin: 0; }
+.btn--sm { min-height: 38px; padding: 0 12px; font-size: 14px; }
+
+.catlist { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.catitem {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  background: var(--surface2); border: 0; border-radius: 12px; padding: 10px 12px; color: var(--text);
+}
+.catitem > span:nth-child(2) { flex: 1; }
+.catitem .muted { margin-left: auto; }
+.catitem.is-archived { opacity: .5; }
+
+/* Statistik */
+.statrow { display: flex; justify-content: space-between; padding: 6px 0; font-size: 15px; }
+.statrow .pos { color: var(--income); } .statrow .neg { color: var(--expense); }
+.statrow--total { border-top: 1px solid #243152; margin-top: 4px; padding-top: 10px; font-weight: 700; }
+.statrow--total .pos { color: var(--income); } .statrow--total .neg { color: var(--expense); }
+.statcats { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.statcat { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; column-gap: 10px; }
+.statcat__name { font-size: 14px; }
+.statcat__bar { grid-column: 1 / -1; height: 6px; background: #243152; border-radius: 4px; overflow: hidden; }
+.statcat__bar > span { display: block; height: 100%; }
+.statcat__val { font-size: 14px; color: var(--muted); }
+
+/* Formular-Bausteine in Overlays */
+.fieldlabel { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.fieldlabel .field { margin-top: 2px; }
+.field--icon { flex: 0 0 64px; text-align: center; font-size: 22px; }
+select.field { -webkit-appearance: none; appearance: none; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.check input { width: 22px; height: 22px; }
+
+/* Farb-Swatches */
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.swatch { width: 36px; height: 36px; border-radius: 50%; border: 2px solid transparent; }
+.swatch.is-active { border-color: var(--text); box-shadow: 0 0 0 2px var(--bg) inset; }
+
+/* Filterleiste (Verlauf) */
+.filterbar { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+
+/* Daten-Buttons */
+.datagrid { display: flex; flex-wrap: wrap; gap: 8px; }
+.datagrid .btn { flex: 1 1 30%; }
+
+/* Bottom-Navigation */
+.tabbar {
+  display: flex; border-top: 1px solid #1f2a44;
+  background: var(--surface); padding-bottom: var(--safe-bottom);
+}
+.tab {
+  flex: 1; min-height: var(--tap); border: 0; background: transparent;
+  color: var(--muted); font-size: 20px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px;
+}
+.tab span { font-size: 11px; }
+.tab.is-active { color: var(--text); }
+
+/* Overlay / Sheet */
+.overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55);
+  display: flex; align-items: flex-end; z-index: 50;
+}
+.overlay[hidden] { display: none; }
+.sheet {
+  width: 100%; background: var(--bg); border-radius: 20px 20px 0 0;
+  padding: 20px 16px calc(var(--safe-bottom) + 20px);
+  display: flex; flex-direction: column; gap: 12px;
+  max-height: 90dvh; overflow-y: auto;
+}
+.sheet h2 { margin: 0 0 4px; font-size: 18px; text-align: center; }
+.sheet__actions { display: flex; gap: 8px; margin-top: 4px; }
