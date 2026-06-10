@@ -2,6 +2,10 @@
 
 Kleines, lokales **Kassenbuch** als **PWA** fürs iPhone. Schnelle Eingabe von Ausgaben & Einnahmen, komplett **offline**, Daten bleiben **lokal** auf dem Gerät. Kein App Store, kein Entwickler-Account.
 
+**🔗 Live: https://globus69.github.io/CashCount/**
+> In **Safari** öffnen → Teilen → **„Zum Home-Bildschirm"**. Danach läuft die App offline, Daten liegen lokal.
+> Deployment automatisch via GitHub Pages (Workflow `.github/workflows/pages.yml`) bei jedem Push auf `master`.
+
 - 📖 Konzept & Datenmodell: [docs/KONZEPT.md](docs/KONZEPT.md)
 - 🗺️ Roadmap & Entscheidungen: [ITERATION.md](ITERATION.md)
 - 🤖 Arbeitsanweisungen: [CLAUDE.md](CLAUDE.md)
