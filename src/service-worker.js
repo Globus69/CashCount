@@ -2,10 +2,11 @@
 // WICHTIG: Bei jeder Änderung an ausgelieferten Dateien CACHE_VERSION erhöhen
 // und neue Dateien in APP_SHELL ergänzen (siehe CLAUDE.md).
 
-const CACHE_VERSION = 'cashcount-v10';
+const CACHE_VERSION = 'cashcount-v11';
 const APP_SHELL = [
   './',
   './index.html',
+  './kategorien.html',
   './manifest.webmanifest',
   './css/styles.css',
   './js/config.js',
@@ -13,6 +14,7 @@ const APP_SHELL = [
   './js/db.js',
   './js/exporter.js',
   './js/sync.js',
+  './js/catconfig.js',
   './js/app.js',
   './icons/icon-180.png',
   './icons/icon-192.png',

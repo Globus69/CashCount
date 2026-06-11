@@ -35,7 +35,13 @@ const DB = (() => {
         if (!db.objectStoreNames.contains('recurring'))
           db.createObjectStore('recurring', { keyPath: 'id' });
       };
-      req.onsuccess = () => { _db = req.result; resolve(_db); };
+      req.onsuccess = () => {
+        _db = req.result;
+        // Wenn ein anderer Tab die DB löschen/upgraden will (z. B. DB-Reset im
+        // Kategorien-Editor): Verbindung freigeben, sonst blockiert der Vorgang.
+        _db.onversionchange = () => { _db.close(); _db = null; };
+        resolve(_db);
+      };
       req.onerror = () => reject(req.error);
     });
   }
@@ -263,8 +269,13 @@ const DB = (() => {
     if (config) await ensureSeed(config);
   }
 
+  // Verbindung schließen (nötig, bevor indexedDB.deleteDatabase greift)
+  function close() {
+    if (_db) { _db.close(); _db = null; }
+  }
+
   return {
-    uuid, open, ensureSeed,
+    uuid, open, close, ensureSeed,
     getSettings, setSettings,
     listAccounts, putAccount, deleteAccount,
     listCategories, putCategory, deleteCategory,

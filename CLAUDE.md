@@ -26,12 +26,14 @@ CashCount/
 │   └── KONZEPT.md      # ausführliches Konzept & Datenmodell
 └── src/                # die eigentliche PWA (das, was gehostet wird)
     ├── index.html
+    ├── kategorien.html # Kategorien-Editor (Desktop), verlinkt aus "Mehr"
     ├── manifest.webmanifest
     ├── service-worker.js
     ├── css/styles.css
     ├── js/
     │   ├── config.js   # << zentrale Konfiguration; vom User frei editierbar (inkl. "wishes")
     │   ├── app.js      # UI/Steuerung
+    │   ├── catconfig.js# Logik des Kategorien-Editors
     │   ├── db.js       # IndexedDB-Wrapper (inkl. Seeding/Migration)
     │   ├── exporter.js # CSV-Export & JSON-Backup (iOS-Teilen-Sheet)
     │   ├── sync.js     # optionaler Geräte-Sync über privates GitHub-Repo

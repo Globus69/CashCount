@@ -1,233 +1,74 @@
 # ITERATION.md — CashCount
 
-Lebendiges Dokument für Roadmap, Entscheidungen und offene Punkte. Neueste Einträge oben.
+Lebendiges Dokument. **Neue Anforderungen unten unter „Neu" eintragen** — sie werden bei
+der nächsten Iteration gelesen, offene Fragen per Spokenly geklärt und dann umgesetzt.
+Die Detail-Historie aller Iterationen steht in den Git-Commits.
 
-## Getroffene Entscheidungen
-- **2026-06-10**
-  - Ansatz: **PWA** (Safari → Zum Home-Bildschirm), offline, Daten lokal (IndexedDB). ✅
-  - Umfang: **Anfangsbestand + Ausgaben + Einnahmen** (echtes Kassenbuch, Soll/Haben). ✅
-  - **Export (CSV)**: erst später, Datenmodell aber gleich dafür ausgelegt.
-  - Sprache/Währung: **Deutsch, Euro**. ✅
-  - Stack: **Vanilla JS, kein Build-Step**; Geld als Cent-Integer.
+---
 
-## Roadmap
+## Neu (hier neue Anforderungen eintragen)
 
-### Iteration 0 — Setup (erledigt)
-- [x] Konzept (docs/KONZEPT.md)
-- [x] Projektstruktur & Doku (CLAUDE.md, ITERATION.md, README.md)
-- [x] PWA-Grundgerüst (index.html, manifest, service-worker, Ordner)
+*(zurzeit leer)*
 
-### Iteration 1 — MVP Erfassung (erledigt 2026-06-10)
-- [x] IndexedDB-Wrapper (`db.js`): settings, categories, transactions, recurring + Seeding
-- [x] Geld-Helfer (`money.js`): Cent ↔ „12,34 €", Eingabe-Parsing
-- [x] Zentrale Konfiguration (`config.js`) inkl. Theme/Defaults/Kategorien
-- [x] Anfangsbestand setzen (Tab „Mehr")
-- [x] Eintrag erfassen (Betrag, Ausgabe/Einnahme, Kategorie, Datum, Notiz)
-- [x] Aktueller Bestand live berechnen & anzeigen (once + monthly)
-- [x] Verlaufsliste (nach Tag gruppiert, Tagessumme) + bearbeiten/löschen
-- [x] Vordefinierte Kategorien aus CONFIG (Seed beim ersten Start)
+---
 
-### Iteration 2 — Kategorien & Wiederkehrend (erledigt 2026-06-10)
-- [x] Eigene Kategorien anlegen/bearbeiten/archivieren (Overlay, Farb-Swatches aus CONFIG)
-- [x] Wiederkehrende Einträge (Regeln: täglich/wöchentlich/monatlich, Start/Ende, aktiv)
-- [x] Automatische Erzeugung fälliger Einträge beim App-Start (markiert mit ↻)
-- [x] Monatsübersicht: Einnahmen/Ausgaben/Saldo + Ausgaben pro Kategorie (Balken)
+## Status
 
-### Iteration 3 — Komfort & Export (erledigt 2026-06-10)
-- [x] CSV-Export (iOS-Teilen-Sheet, Fallback Download; deutsches Format, BOM)
-- [x] JSON-Backup sichern & laden (ersetzt alle Daten, mit Bestätigung)
-- [x] Filter & Suche im Verlauf (Text, Typ, Kategorie)
-- [x] App-Icons (180/192/512 + maskable) generiert — Euro-Münze im Theme-Look
+Stand **2026-06-11**: Iterationen 0–8 vollständig umgesetzt und live unter
+https://globus69.github.io/CashCount/ (Service-Worker v11). Geräte-Sync über das
+private Repo `Globus69/cashcount-daten` ist eingerichtet und läuft.
 
-## Offene Punkte / zu klären (beantwortet, in Iteration 4 verarbeitet)
-- App-Icon: ok, aber in Rot/Orange → **noch offen** (siehe „Offen / später")
-- Standard-Kategorien → ersetzt durch Kategorie-Hierarchie aus Iteration 4 (s. u.)
-- Anfangsbestand „monatlich neu" → **revidiert**: mit echten Konten durchlaufend (s. Iteration 4)
-- Wiederkehrend: Intervalle täglich/wöchentlich/monatlich ✅ (seit Iteration 2)
+## Getroffene Entscheidungen (gültig)
 
+- **PWA** (Safari → Home-Bildschirm), offline-first, **Vanilla JS ohne Build-Step**.
+- **Geld immer als Cent-Integer**; Sprache/Währung Deutsch / Euro.
+- **Konten** Bar (Vorgabe), Sparda, Revolut, Mercedes — Bestand **pro Konto**,
+  durchlaufend (kein monatliches Zurücksetzen).
+- **Transfers** (auch Bargeld-Ein-/Auszahlung) sind reine Umbuchungen —
+  zählen **nicht** als Einnahme/Ausgabe.
+- **Kategorien**: 3 Spalten (Einkauf / Boot / Sonstiges), **max. 2 Ebenen**,
+  gebucht wird nur auf Blatt-Kategorien.
+- **Geräte-Sync** über privates GitHub-Repo (Contents-API) — kein eigener Server;
+  Token/Repo liegen nur lokal auf dem Gerät.
+- **config.js-Abgleich**: dort neu eingetragene Kategorien werden beim App-Start
+  ergänzt (auch auf Bestandsgeräten); bestehende/archivierte bleiben unangetastet.
 
+## Erledigte Iterationen (Kurzfassung)
 
-## Änderungen
-01 Auf der Eingabepage sollen vorhanden sein:
-Vier Schnell Eingabe Buttons mit: 2,50 € 5 Euro 7,50 Euro, 10 Euro
-Bei dem Druck auf die Buttons nacheinander oder mehrfach, Werden die Werte addiert.
-Ein Clear Button muss auch neben die angezeigte Summe Platziert werden.
+### Iteration 0–3 (2026-06-10) — Grundgerüst & MVP
+PWA-Setup (Manifest, Service-Worker, Icons) · Erfassen/Verlauf/Bearbeiten ·
+eigene Kategorien · wiederkehrende Regeln (täglich/wöchentlich/monatlich) mit
+Auto-Erzeugung · Monatsübersicht · CSV-Export (iOS-Teilen) · JSON-Backup · Filter & Suche.
 
-02 die Eingabe von Kategorien soll wie folgt aussehen: Vier Buttons So wie sie jetzt sind Mit folgendem Content:
-Drei Spalten:
-Spalte a) Einkauf
-- Lebensmittel
-- Haushalt
-- Kleidung
-- sonstiges
+### Iteration 4 (2026-06-11) — Konten, Schnell-Eingabe & Kategorie-Hierarchie
+Vier additive Schnell-Buttons (2,50/5/7,50/10 €) + Clear · Kategorie-Spalten mit
+ausklappbarer Ebene 2 · Konto-Auswahl beim Erfassen · Konten-Tab mit
+Transfer/Ein-/Auszahlung & Anfangsbeständen je Konto · Konten-Summe auf der
+Eingabeseite · DB v2 (accounts/transfers) · CSV mit Konto-Spalte.
+**Review-Fixes:** v1→v2-Migration (leerer Picker auf Bestandsgeräten), Backup-Import
+alter Backups, UTC-Datums-Bug (Endlosschleife in `generateDueRecurring`), Toast global,
+„beides"-Kategorien, max. 2 Ebenen erzwungen, `Money.parse` Tausenderpunkt u. a.
 
-Spalte b) Boot
-- Energie
--- Diesel
--- Benzin
--- Gas
-- Technik
--- 
+### Iteration 5 (2026-06-11) — Kompakt-Layout, Statistik & Prognose
+Kompakte Bestands-Kopfzeile · Speichern-Button sticky (immer sichtbar) ·
+Statistik-Tab 📊: Monats-Navigation, Kennzahlen-Karten, Donut „Ausgaben nach Bereich",
+Tagesbalken, 6-Monats-Trend, Top-Kategorien · 3-Monats-Prognose aus wiederkehrenden
+Regeln auf der Eingabeseite.
 
-Die Spalten Überschriften ABC sollen immer eingeblendet werden mit darunter eingeblendet Der ersten Ebene
-Beispiel:
-Boot
-- Energie
-- Technik
+### Iteration 6 (2026-06-11) — Offene Punkte & Config-Abgleich
+App-Icon in Rot/Orange (Motiv Euro-Münze) · Lebensmittel → Supermarkt/Bäcker ·
+`syncConfigCategories` (config.js-Abgleich) · nur-vertikales Scrollen auf dem iPhone.
 
+### Iteration 7 (2026-06-11) — Geräte-Sync über GitHub
+`js/sync.js`: privates Repo als Speicher, SHA-Locking · automatisch beim Start
+(vor `generateDueRecurring`), alle 5 Min, ~8 s nach Änderungen · ↻-Button im Kopf +
+„Jetzt synchronisieren" in „Mehr" · Konflikt → Nachfrage · Einrichtung erfolgt:
+Repo `Globus69/cashcount-daten`, Fine-grained-Token (Contents Read/Write).
 
-Wird dann zum Beispiel Energie ausgewählt, Wird die zweite Ebene eingeblendet
-- Energie
--- Diesel
--- Benzin
--- Gas
-
-03 An einer sinnvollen und praktischen Stelle muss ebenso ausgewählt werden können von welchem Account bezahlt wird:
-- Bar
-- Sparda
-- Revolut
-- Mercedes
-Vorgabe ist "Bar"
-
-04 Auf einer Unterseite müssen eingestellt werden können Transfer von Konto  A nach B oder Einzahlung oder Abhebungen Von Bargeld
-
-05 Auf der Eingabeseite muss auch klein angezeigt werden die Summe aller Konten Und Die Beträge der Einzel Konten
-
-## Iteration 4 — Konten, Schnell-Eingabe & Kategorie-Hierarchie (umgesetzt 2026-06-11)
-
-- [x] 01 Schnell-Eingabe-Buttons (2,50/5/7,50/10 €, additiv) + Clear-Button am Betragsfeld
-- [x] 02 Kategorie-Hierarchie: 3 Spalten (Einkauf/Boot/Sonstiges), Ebene 2 ausklappbar
-- [x] 03 Konto-Auswahl beim Erfassen (Bar/Sparda/Revolut/Mercedes, Vorgabe Bar)
-- [x] 04 Konten-Tab: Transfer/Einzahlung/Abhebung (reine Umbuchung, nicht in Monatsstatistik)
-- [x] 05 Kleine Konten-Summe (gesamt + je Konto) auf der Eingabeseite
-- [x] DB v2 (Stores accounts/transfers), CSV mit Konto-Spalte, Service-Worker v6/v7
-
-### Review-Fixes (2026-06-11, nach Agenten-Review)
-- [x] **Migration v1→v2**: alte Kategorien ohne `group` machten den Ausgaben-Picker leer
-      (Kategorie-Auswahl unsichtbar auf Bestandsgeräten!) → neue Struktur wird nachgeseedet,
-      alte flache Ausgaben-Kategorien archiviert; alter globaler Anfangsbestand
-      (`settings.startBalanceCents`) wandert aufs Default-Konto
-- [x] **Backup-Import alter v1-Backups**: leerte den Konten-Store → `importAll` ruft jetzt
-      `ensureSeed` (Migration) auf; Icon/Farbe werden beim Import validiert
-- [x] **Datums-Bug (kritisch)**: `nextDay()` via `toISOString()` (UTC) lieferte in UTC+x
-      denselben Tag zurück → Endlosschleife in `generateDueRecurring` sobald eine Regel
-      aktiv ist; jetzt lokale Datumsformatierung überall
-- [x] Toast global statt nur in „Erfassen" sichtbar (z. B. „Umgebucht ✓", Import-Fehler)
-- [x] „beides"-Kategorien erscheinen jetzt auch im Ausgaben-Picker
-- [x] Max. 2 Kategorie-Ebenen erzwungen; Archivieren eines Parents archiviert Kinder mit
-- [x] Reaktivierte wiederkehrende Regel füllt inaktiven Zeitraum nicht mehr rückwirkend auf
-- [x] CSV: Alt-Buchungen ohne Konto werden dem Default-Konto zugeordnet (wie in der App)
-- [x] `Money.parse`: „1.234,56" (Tausenderpunkt) korrekt
-
-Verbindliche Antworten zu 01–05 (per Spokenly geklärt):
-
-### 02 — Kategorie-Hierarchie (alte flache Kategorien werden ERSETZT, später neu iteriert)
-Drei feste Spalten, Überschrift immer sichtbar, darunter Ebene-1-Buttons; Tap auf eine
-Ebene-1-Kategorie mit Kindern klappt Ebene 2 auf.
-- **a) Einkauf:** Lebensmittel, Haushalt, Kleidung, Sonstiges  (Ebene 2 vorerst leer → „später")
-- **b) Boot:**
-  - Energie → Diesel, Benzin, Gas
-  - Technik → Inside, Outside
-- **c) Sonstiges:** Geschenk (u. a., später ergänzen)
-
-### 03/05 — Konten
-- Konten: **Bar** (Vorgabe), **Sparda**, **Revolut**, **Mercedes**.
-- **Bestand pro Konto** (eigener Anfangsbestand je Konto), durchlaufend — KEIN monatliches
-  Zurücksetzen (überschreibt die frühere „monatlich neu"-Entscheidung; mit echten Konten sinnlos).
-- Jede Buchung wirkt nur auf das gewählte Konto.
-- Eingabeseite zeigt klein: **Summe aller Konten** = Addition + die Einzel-Konto-Beträge.
-
-### 04 — Transfer-Unterseite
-- Transfer Konto A → B sowie Bargeld-Einzahlung/Abhebung.
-- Reine Umbuchung: **NICHT** als Einnahme/Ausgabe in der Monatsübersicht zählen,
-  verändert nur die Konto-Bestände.
-
-### 01 — Schnell-Eingabe
-- Vier additive Buttons: 2,50 € · 5 € · 7,50 € · 10 € (mehrfach tippen addiert).
-- Clear-Button neben der angezeigten Summe.
-
-### Offen / später
-- ~~Ebene-2 für Einkauf-Kategorien, weitere Sonstiges-Einträge, Icon-Recolor (Rot/Orange)~~
-  → erledigt bzw. geklärt in Iteration 6 (s. u.)
-
-
-## Iteration 5 — Kompakt-Layout, Statistik & Prognose (umgesetzt 2026-06-11)
-
-Anforderungen (oben eingetragen) und Umsetzung:
-
-- [x] **Kompakter Kopfbereich**: Bestand als schmale Kopfzeile (Label links, Wert rechts,
-      26 px statt 42 px); Betragsfeld leicht verkleinert; Datum + Notiz in einer Zeile
-- [x] **Speichern immer sichtbar**: Button ist sticky am unteren Rand des Scrollbereichs
-      (über der Tabbar) — kein Scrollen mehr nötig, um zu speichern
-- [x] **Statistik-Seite** (neuer 5. Tab 📊):
-      - Monats-Navigation (‹ Monat ›, vor aktuellen Monat hinaus gesperrt)
-      - Kennzahlen-Karten: Einnahmen / Ausgaben / Saldo
-      - **Donut-Chart** „Ausgaben nach Bereich" (SVG; Ebene-2-Buchungen werden dem
-        Elternknoten zugerechnet, Farben aus den Kategorien, Legende mit % und Betrag)
-      - **Tagesbalken**: Ausgaben pro Tag über den Monat (mit Achse + höchster Tag)
-      - **6-Monats-Trend**: Einnahmen vs. Ausgaben als Balkenpaare
-      - **Top-Kategorien** (Blatt-Ebene, Top 8 + Rest-Summe)
-      - Monatsübersicht aus „Mehr" hierher umgezogen
-- [x] **3-Monats-Prognose** auf der Eingabeseite: projizierter Gesamtbestand zum Ende der
-      nächsten drei Monate aus den aktiven wiederkehrenden Regeln (inkl. Monats-Delta);
-      ausgeblendet, wenn keine aktive Regel existiert
-- [x] Service-Worker v8
-
-Original-Anforderungen:
-
-- Im oberen Bereich des Bildschirms muss der Anfangsbestand und Der eingegebene Wert Platzsparender angeordnet werden, Gegebenenfalls nebeneinander und in der Größe differenziert.
-
-- Der Bildschirm muss so strukturiert werden dass der Speicher Button zu jederzeit sichtbar ist wenn Ein Betrag eingegeben wurde es darf nicht sein dass gescrollt werden muss um speichern zu können.
-
-- Sei kreativ und mach mir auch noch mal eine Seite mit statistischen Auswertungen in den übersichtlich und besten und schönsten Wägen die du findest und für dich erdenken kannst.
-
-- Gib in einer separaten Anzeige auf dem Display bei der Eingabe unter oder neben oder wie auch immer angeordnet, Eine Vorschau auf die nächsten drei Monate wie sich anhand der wiederkehrenden Einnahmen und Außenabgaben Der Kontobestand entwickeln wird.
-
-
-
-## Iteration 6 — Offene Punkte & Config-Abgleich (umgesetzt 2026-06-11)
-
-Per Spokenly geklärt und umgesetzt:
-
-- [x] **App-Icon in Rot/Orange** (Motiv Euro-Münze bleibt; Verlauf Orange → dunkles Rot,
-      orange-rotes €) — alle 4 Größen neu generiert
-- [x] **Ebene 2 für Lebensmittel**: Supermarkt, Bäcker (weitere ergänzt der User
-      später selbst in `config.js`)
-- [x] **Sonstiges-Spalte**: bleibt vorerst nur „Geschenk" (User ergänzt später selbst)
-- [x] **Config-Abgleich** (`syncConfigCategories`): in `config.js` NEU eingetragene
-      Kategorien werden beim App-Start auch auf Bestandsgeräten ergänzt (Abgleich über
-      Name + Spalte/Elternknoten). Bestehende/archivierte Einträge werden nie verändert —
-      Voraussetzung dafür, dass „später selbst in der Konfiguration" funktioniert
-- [x] **Nur-vertikales Scrollen** auf dem Mobilgerät: horizontales Ausweichen/Bouncen
-      unterbunden (`overflow-x: hidden`, `touch-action: pan-y`, `overscroll-behavior`)
-- [x] Service-Worker v9
-
-## Iteration 7 — Geräte-Sync über GitHub (umgesetzt 2026-06-11)
-
-Per Spokenly geklärt: **Option A** — Sync über das bestehende GitHub-Konto
-(privates Repository als Speicher). Revidiert damit die Grundsatzentscheidung
-„keine Cloud" — es bleibt aber bei „kein eigener Server".
-
-- [x] Neues Modul `js/sync.js`: liest/schreibt `cashcount-data.json` in einem
-      **privaten** GitHub-Repo (Contents-API, SHA-basiertes optimistic locking)
-- [x] **Automatisch**: Pull beim App-Start (VOR `generateDueRecurring`, damit zwei
-      Geräte fällige Regeln nicht doppelt erzeugen), Intervall alle 5 Min,
-      debounced Push ~8 s nach jeder Änderung
-- [x] **Manuell**: Refresh-Button (↻) im Kopfbereich + „Jetzt synchronisieren" in „Mehr"
-- [x] Einrichtung in „Mehr → Sync (GitHub)": Repo (`benutzer/repository`) + Fine-grained-Token
-      (nur Contents Read/Write); beides liegt NUR im localStorage des Geräts,
-      wird nie mitsynchronisiert
-- [x] Konfliktfall (beide Seiten geändert): Nachfrage — Cloud-Stand übernehmen
-      oder lokalen Stand hochladen (Last-Write-Wins auf Gesamtbestand)
-- [x] Service-Worker v10 (sync.js in der App-Shell)
-
-Einrichtungs-Schritte (einmalig, auf jedem Gerät):
-1. Auf github.com ein **privates** Repo anlegen (z. B. `cashcount-daten`).
-2. GitHub → Settings → Developer settings → Fine-grained tokens → Token nur für
-   dieses Repo, Berechtigung „Contents: Read and write".
-3. In der App unter „Mehr → Sync": `benutzer/repo` + Token eintragen,
-   „Automatisch synchronisieren" anhaken, Sichern.
-
-Original-Anforderungen:
-- Auf dem Mobilgerät darf beim scrollen der Bildschirm nicht seitlich ausweichen und dann Teile des Bildschirms verdecken beziehungsweise freie Stellenanzeigen wenn andere Bereiche verdeckt sind. Sozusagen eines statischessscrollen nur Vertikal.
-- Die Daten müssen sich auf dem Mobilgerät und dem Laptop synchronisieren. Automatisch in Zeitintervall und oder mit einem Refresh Button
+### Iteration 8 (2026-06-11) — Kategorien-Editor, DB-Reset & Datei-Neustrukturierung
+Diese Datei neu strukturiert (alles Bisherige erledigt) · Neue Seite
+**`kategorien.html`** (für Desktop gedacht, Link in „Mehr"): Kategorien und
+Unterkategorien grafisch bearbeiten — umbenennen, Icon/Farbe ändern, Reihenfolge
+per Drag & Drop oder Pfeilen, Ebene wechseln (Ebene 1 ↔ 2), Spalte/Elternknoten
+verschieben, neu anlegen, archivieren, löschen · **Datenbank-Reset**-Button mit
+doppeltem Warnhinweis · schreibt direkt in die Datenbank und stößt den Geräte-Sync an.

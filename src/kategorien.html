@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f766e">
+  <title>CashCount — Kategorien</title>
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* Editor-spezifische Styles (Desktop-orientiert, funktioniert auch mobil) */
+    body { max-width: 860px; margin: 0 auto; }
+    .pagehead {
+      display: flex; align-items: center; gap: 14px;
+      padding: calc(var(--safe-top) + 14px) 16px 12px;
+      background: linear-gradient(180deg, var(--accent), transparent);
+    }
+    .pagehead h1 { margin: 0; font-size: 20px; flex: 1; }
+    .pagehead a { color: #fff; text-decoration: none; font-size: 15px; opacity: .9; }
+    .pagestatus { font-size: 12px; color: rgba(255,255,255,.7); }
+
+    .khint { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+    .kgroup { margin-bottom: 18px; }
+    .kgroup__head {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+      font-size: 13px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .4px;
+    }
+    .kgroup__head .btn--sm { text-transform: none; letter-spacing: 0; }
+    .klist { display: flex; flex-direction: column; gap: 6px; min-height: 8px; }
+
+    .krow {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--surface); border: 1px solid #243152; border-radius: 10px;
+      padding: 6px 10px;
+    }
+    .krow.is-child { margin-left: 38px; background: var(--surface2); }
+    .krow.is-archived { opacity: .45; }
+    .krow.is-dragging { opacity: .4; border-style: dashed; }
+    .krow__drag { cursor: grab; color: var(--muted); font-size: 15px; padding: 4px 2px; user-select: none; }
+    .krow__icon {
+      width: 44px; text-align: center; font-size: 18px;
+      background: transparent; border: 1px solid transparent; border-radius: 8px;
+      color: var(--text); min-height: 36px;
+    }
+    .krow__name {
+      flex: 1; min-width: 80px; font-size: 15px;
+      background: transparent; border: 1px solid transparent; border-radius: 8px;
+      color: var(--text); min-height: 36px; padding: 0 8px;
+    }
+    .krow__icon:focus, .krow__name:focus { border-color: var(--accent); outline: none; background: var(--bg); }
+    .krow__color {
+      width: 34px; height: 34px; padding: 0; border: 0; background: transparent; border-radius: 50%;
+    }
+    .krow__color::-webkit-color-swatch-wrapper { padding: 3px; }
+    .krow__color::-webkit-color-swatch { border-radius: 50%; border: 1px solid #243152; }
+    .krow__sel {
+      max-width: 150px; min-height: 36px; font-size: 13px;
+      background: var(--bg); color: var(--text); border: 1px solid #243152; border-radius: 8px;
+    }
+    .kbtn {
+      min-width: 34px; min-height: 34px; border-radius: 8px;
+      border: 1px solid #243152; background: var(--bg); color: var(--text); font-size: 14px;
+    }
+    .kbtn:disabled { opacity: .25; }
+    .kbtn--danger { color: var(--expense); border-color: #3a2030; }
+
+    .kadd { display: flex; gap: 8px; margin-top: 16px; }
+    .kadd .field { min-height: 44px; }
+
+    .danger-zone { border: 1px solid #5b2030; }
+    .danger-zone h2 { color: var(--expense); }
+
+    @media (max-width: 560px) {
+      .krow__sel { max-width: 96px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="pagehead">
+    <a href="index.html">← App</a>
+    <h1>Kategorien strukturieren</h1>
+    <span class="pagestatus" id="pageStatus"></span>
+  </header>
+
+  <main>
+    <p class="khint">
+      Reihenfolge per <strong>Ziehen am ⠿-Griff</strong> oder mit <strong>↑ ↓</strong> ändern ·
+      <strong>➘</strong> macht eine Kategorie zur Unterkategorie der darüberliegenden ·
+      <strong>⬆</strong> hebt eine Unterkategorie auf Ebene 1 ·
+      Spalte/Zuordnung über die Auswahl-Box · Name/Symbol/Farbe direkt in der Zeile ändern.
+      Änderungen werden sofort gespeichert und synchronisiert.
+    </p>
+
+    <div id="groupsWrap"></div>
+
+    <div class="kadd">
+      <input id="newGroupName" class="field" placeholder="Neue Spalte (z. B. Auto)">
+      <button type="button" class="btn" id="addGroupBtn">+ Spalte</button>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <div class="card__head">
+        <h2>Einnahme-Kategorien</h2>
+        <button type="button" class="btn btn--sm" id="addIncomeBtn">+ Neu</button>
+      </div>
+      <div class="klist" id="incomeList" data-scope="income"></div>
+    </div>
+
+    <div class="card danger-zone" style="margin-top:24px">
+      <h2>⚠️ Gefahrenzone</h2>
+      <p class="muted">Setzt die Datenbank dieses Geräts vollständig zurück: alle Buchungen,
+        Konten, Kategorien, Regeln und Umbuchungen werden gelöscht und die App startet wie
+        beim ersten Mal (Standardwerte aus der Konfiguration). Die Sync-Einstellungen dieses
+        Geräts werden ebenfalls entfernt — die Datei im GitHub-Repo bleibt bestehen.</p>
+      <button type="button" class="btn danger" id="dbResetBtn">Datenbank zurücksetzen…</button>
+    </div>
+  </main>
+
+  <p class="toast" id="toast" hidden></p>
+
+  <script src="js/config.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/catconfig.js"></script>
+</body>
+</html>

@@ -242,6 +242,10 @@ input[type="date"].field { color-scheme: dark; }
   font-size: 16px; font-weight: 600;
 }
 .btn.danger { background: transparent; color: var(--expense); border-color: var(--expense); }
+.btn--anchor {
+  display: inline-flex; align-items: center; justify-content: center;
+  text-decoration: none; padding: 0 18px; min-height: var(--tap);
+}
 
 /* Verlauf */
 .dayhead {
