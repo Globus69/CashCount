@@ -20,29 +20,72 @@ const CONFIG = {
     locale: "de-DE",        // Format für Zahlen/Datum (Deutsch)
   },
 
-  // --- Anfangsbestand -----------------------------------------------------
-  balance: {
-    // "once"    = ein einmaliger Anfangsbestand, läuft durch
-    // "monthly" = jeder Monat startet neu mit diesem Wert
-    mode: "once",
-    // Vorgabewert in EURO (NICHT Cent). Beispiel: 100.00 = 100 Euro.
-    // Den echten Wert setzt du später bequem in der App.
-    defaultStartEuro: 0.00,
+  // --- Konten -------------------------------------------------------------
+  // Jedes Konto hat einen EIGENEN, durchlaufenden Bestand. Buchungen wirken
+  // nur auf das gewählte Konto. "startEuro" ist der Anfangsbestand in EURO
+  // (NICHT Cent) — den echten Wert setzt du bequem im Tab „Konten".
+  accounts: {
+    list: [
+      { name: "Bar",      startEuro: 0.00 },
+      { name: "Sparda",   startEuro: 0.00 },
+      { name: "Revolut",  startEuro: 0.00 },
+      { name: "Mercedes", startEuro: 0.00 },
+    ],
+    default: "Bar",         // beim Erfassen vorausgewähltes Konto
   },
 
-  // --- Kategorien ---------------------------------------------------------
-  // type: "expense" = nur Ausgaben, "income" = nur Einnahmen, "both" = beides.
-  // icon: ein Emoji. color: Hex-Farbe. Reihenfolge = Anzeigereihenfolge.
-  // Lösche, ergänze oder benenne nach Belieben um.
-  categories: [
-    { name: "Lebensmittel", icon: "🛒", color: "#22c55e", type: "expense" },
-    { name: "Restaurant",   icon: "🍽️", color: "#f97316", type: "expense" },
-    { name: "Transport",    icon: "🚗", color: "#3b82f6", type: "expense" },
-    { name: "Wohnen",       icon: "🏠", color: "#a855f7", type: "expense" },
-    { name: "Freizeit",     icon: "🎉", color: "#ec4899", type: "expense" },
-    { name: "Gesundheit",   icon: "💊", color: "#ef4444", type: "expense" },
-    { name: "Sonstiges",    icon: "📦", color: "#64748b", type: "expense" },
-    { name: "Einnahme",     icon: "💰", color: "#16a34a", type: "income"  },
+  // --- Schnell-Eingabe ----------------------------------------------------
+  // Buttons auf der Erfassen-Seite. Mehrfaches Tippen addiert die Werte.
+  // Beträge in EURO.
+  quickAmountsEuro: [2.50, 5.00, 7.50, 10.00],
+
+  // --- Anfangsbestand -----------------------------------------------------
+  balance: {
+    // Bestand läuft durchlaufend (kein monatliches Zurücksetzen).
+    mode: "once",
+  },
+
+  // --- Kategorien (Ausgaben) ---------------------------------------------
+  // Hierarchie in Spalten. Jede Spalte hat eine Überschrift (column) und
+  // Ebene-1-Einträge (items). Ein Eintrag kann "children" (Ebene 2) haben;
+  // dann wird beim Antippen die zweite Ebene aufgeklappt und dort gebucht.
+  // icon: Emoji, color: Hex.
+  categoryTree: [
+    {
+      column: "Einkauf",
+      items: [
+        { name: "Lebensmittel", icon: "🛒", color: "#22c55e" },
+        { name: "Haushalt",     icon: "🧺", color: "#3b82f6" },
+        { name: "Kleidung",     icon: "👕", color: "#a855f7" },
+        { name: "Sonstiges",    icon: "📦", color: "#64748b" },
+      ],
+    },
+    {
+      column: "Boot",
+      items: [
+        { name: "Energie", icon: "⛽", color: "#f97316", children: [
+          { name: "Diesel", icon: "🛢️", color: "#f97316" },
+          { name: "Benzin", icon: "⛽", color: "#eab308" },
+          { name: "Gas",    icon: "🔥", color: "#ef4444" },
+        ] },
+        { name: "Technik", icon: "🔧", color: "#14b8a6", children: [
+          { name: "Inside",  icon: "🛋️", color: "#14b8a6" },
+          { name: "Outside", icon: "⚓", color: "#3b82f6" },
+        ] },
+      ],
+    },
+    {
+      column: "Sonstiges",
+      items: [
+        { name: "Geschenk", icon: "🎁", color: "#ec4899" },
+      ],
+    },
+  ],
+
+  // --- Kategorien (Einnahmen) --------------------------------------------
+  // Einnahmen sind (noch) flach. Werden als Chips angezeigt.
+  incomeCategories: [
+    { name: "Einnahme", icon: "💰", color: "#16a34a" },
   ],
 
   // --- Wiederkehrende Einträge -------------------------------------------
@@ -54,7 +97,7 @@ const CONFIG = {
   // --- Bedienung / UI -----------------------------------------------------
   ui: {
     defaultType: "expense",   // beim Erfassen vorausgewählt: "expense" oder "income"
-    defaultView: "capture",   // Startansicht: "capture" | "history" | "more"
+    defaultView: "capture",   // Startansicht: "capture" | "history" | "accounts" | "more"
     // Farben des Erscheinungsbilds (Hex). Standard: dunkles Design.
     theme: {
       accent:  "#0f766e",     // Akzentfarbe (Bestandsbereich, Buttons)
@@ -82,7 +125,6 @@ const CONFIG = {
   // =========================================================================
   wishes: [
     // "Beispiel: Bitte eine Kategorie 'Auto' ergänzen.",
-    // "Beispiel: Anfangsbestand soll monatlich neu starten.",
   ],
 
 };

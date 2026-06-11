@@ -1,6 +1,9 @@
 // app.js — UI-Steuerung.
 // Iteration 1: Erfassen, Live-Bestand, Verlauf (bearbeiten/löschen), Anfangsbestand.
 // Iteration 2: Kategorien-CRUD, wiederkehrende Einträge (+ Auto-Erzeugung), Monatsübersicht.
+// Iteration 3: CSV/Backup, Filter & Suche.
+// Iteration 4: Konten (Bestand pro Konto) + Transfers, Schnell-Eingabe (additiv),
+//              Kategorie-Hierarchie (Spalten, Ebene 1 -> Ebene 2).
 
 (function () {
   'use strict';
@@ -18,13 +21,15 @@
 
   const state = {
     settings: null,
+    accounts: [],
     categories: [],
     transactions: [],
+    transfers: [],
     recurring: [],
-    capture: { type: CONFIG.ui.defaultType || 'expense', categoryId: null },
-    edit: { id: null, type: null, categoryId: null },
+    capture: { type: CONFIG.ui.defaultType || 'expense', categoryId: null, expandedParentId: null, accountId: null },
+    edit: { id: null, type: null, categoryId: null, expandedParentId: null, accountId: null },
     cat: { id: null, color: null },
-    recur: { id: null, type: 'expense', categoryId: null },
+    recur: { id: null, type: 'expense', categoryId: null, expandedParentId: null, accountId: null },
     filter: { q: '', type: 'all', cat: 'all' },
   };
 
@@ -53,16 +58,6 @@
     if (t.expense) root.setProperty('--expense', t.expense);
     if (t.income) root.setProperty('--income', t.income);
   }
-  const categoryById = (id) => state.categories.find((c) => c.id === id) || null;
-  const categoriesForType = (type) =>
-    state.categories.filter((c) => !c.archived && (c.type === type || c.type === 'both'));
-
-  function dateLabel(iso) {
-    if (iso === todayISO()) return 'Heute';
-    if (iso === nextDay(new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10))) return 'Gestern';
-    return new Date(iso + 'T00:00:00').toLocaleDateString('de-DE',
-      { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
-  }
   function escapeHtml(s) {
     return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   }
@@ -72,17 +67,89 @@
     t.textContent = msg; t.hidden = false;
     setTimeout(() => { t.hidden = true; }, 1500);
   }
+  function dateLabel(iso) {
+    if (iso === todayISO()) return 'Heute';
+    if (iso === nextDay(new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10))) return 'Gestern';
+    return new Date(iso + 'T00:00:00').toLocaleDateString('de-DE',
+      { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
 
-  function computeBalance() {
+  // ---------- Konten ----------
+  const accountById = (id) => state.accounts.find((a) => a.id === id) || null;
+  const activeAccounts = () => state.accounts.filter((a) => !a.archived).sort((a, b) => (a.order || 0) - (b.order || 0));
+  function defaultAccountId() {
     const s = state.settings || {};
-    let txs = state.transactions;
-    if ((s.mode || 'once') === 'monthly') {
-      const m = todayISO().slice(0, 7);
-      txs = txs.filter((t) => (t.date || '').slice(0, 7) === m);
+    if (s.defaultAccountId && accountById(s.defaultAccountId)) return s.defaultAccountId;
+    const first = activeAccounts()[0] || state.accounts[0];
+    return first ? first.id : null;
+  }
+  // Buchungen ohne accountId (Altbestand) werden dem Default-Konto zugerechnet.
+  const txAccountId = (t) => t.accountId || defaultAccountId();
+
+  function accountBalance(accId) {
+    const acc = accountById(accId);
+    let bal = acc ? (acc.startBalanceCents || 0) : 0;
+    for (const t of state.transactions) {
+      if (txAccountId(t) !== accId) continue;
+      bal += t.type === 'income' ? t.amountCents : -t.amountCents;
     }
-    let bal = s.startBalanceCents || 0;
-    for (const t of txs) bal += t.type === 'income' ? t.amountCents : -t.amountCents;
+    for (const tr of state.transfers) {
+      if (tr.toAccountId === accId) bal += tr.amountCents;
+      if (tr.fromAccountId === accId) bal -= tr.amountCents;
+    }
     return bal;
+  }
+  const totalBalance = () => activeAccounts().reduce((sum, a) => sum + accountBalance(a.id), 0);
+
+  // ---------- Kategorien (Hierarchie) ----------
+  const categoryById = (id) => state.categories.find((c) => c.id === id) || null;
+  const childrenOf = (parentId) =>
+    state.categories.filter((c) => !c.archived && c.parentId === parentId)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+  const isLeaf = (cat) => !cat || childrenOf(cat.id).length === 0;
+
+  // Einnahmen/„beides" werden als flache Chips angeboten.
+  const incomeLikeCats = (type) =>
+    state.categories.filter((c) => !c.archived && (c.type === type || c.type === 'both'))
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  // Ausgaben-Spalten in Reihenfolge.
+  function expenseGroups() {
+    const seen = [];
+    state.categories
+      .filter((c) => !c.archived && c.type === 'expense' && !c.parentId && c.group)
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .forEach((c) => { if (!seen.includes(c.group)) seen.push(c.group); });
+    return seen;
+  }
+  const level1 = (group) =>
+    state.categories.filter((c) => !c.archived && c.type === 'expense' && !c.parentId && c.group === group)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  function isValidLeaf(id, type) {
+    const c = categoryById(id);
+    if (!c || c.archived) return false;
+    if (type === 'income') return c.type === 'income' || c.type === 'both';
+    return c.type === 'expense' && isLeaf(c);
+  }
+  function defaultCategoryId(type) {
+    if (type === 'income') {
+      const inc = incomeLikeCats('income')[0];
+      return inc ? inc.id : null;
+    }
+    for (const g of expenseGroups()) {
+      for (const l1 of level1(g)) {
+        const kids = childrenOf(l1.id);
+        return kids.length ? kids[0].id : l1.id;
+      }
+    }
+    return null;
+  }
+  // validiert ctx.categoryId für den Typ und klappt ggf. den Elternknoten auf.
+  function syncCategory(ctx, type) {
+    if (!isValidLeaf(ctx.categoryId, type)) ctx.categoryId = defaultCategoryId(type);
+    const c = categoryById(ctx.categoryId);
+    ctx.expandedParentId = c && c.parentId ? c.parentId : ctx.expandedParentId;
   }
 
   // ---------- Wiederkehrende Einträge erzeugen ----------
@@ -100,8 +167,8 @@
         if (isDue(r, d)) {
           await DB.putTransaction({
             id: DB.uuid(), date: d, amountCents: r.amountCents, type: r.type,
-            categoryId: r.categoryId, note: r.note, recurringId: r.id,
-            createdAt: new Date().toISOString(),
+            categoryId: r.categoryId, accountId: r.accountId || defaultAccountId(),
+            note: r.note, recurringId: r.id, createdAt: new Date().toISOString(),
           });
           created++;
         }
@@ -112,10 +179,9 @@
     return created;
   }
 
-  // ---------- Chips ----------
-  function renderChips(container, type, selectedId, onPick) {
-    container.innerHTML = '';
-    categoriesForType(type).forEach((c) => {
+  // ---------- Kategorie-Picker ----------
+  function renderChips(container, cats, selectedId, onPick) {
+    cats.forEach((c) => {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'chip' + (c.id === selectedId ? ' is-active' : '');
@@ -126,28 +192,135 @@
     });
   }
 
-  // ---------- Renders ----------
-  function renderBalance() {
-    const bal = computeBalance();
-    const el = $('#balanceValue');
-    el.textContent = Money.format(bal);
-    el.classList.toggle('is-negative', bal < 0);
-    const s = state.settings || {};
-    $('#balanceSub').textContent =
-      s.mode === 'monthly' ? 'Monat ' + todayISO().slice(0, 7) : 'seit ' + (s.startDate || '–');
-  }
+  // Hierarchischer Picker (Ausgaben) bzw. Chips (Einnahmen).
+  function renderPicker(container, type, selectedId, expandedParentId, onSelectLeaf, onToggleParent) {
+    container.innerHTML = '';
+    if (type !== 'expense') {
+      container.className = 'picker picker--chips';
+      renderChips(container, incomeLikeCats(type), selectedId, onSelectLeaf);
+      return;
+    }
+    container.className = 'picker picker--cols';
+    expenseGroups().forEach((group) => {
+      const col = document.createElement('div');
+      col.className = 'catcol';
+      const head = document.createElement('div');
+      head.className = 'catcol__head';
+      head.textContent = group;
+      col.appendChild(head);
 
-  function renderCapture() {
-    $$('#captureType .typebtn').forEach((b) =>
-      b.classList.toggle('is-active', b.dataset.type === state.capture.type));
-    const valid = categoriesForType(state.capture.type);
-    if (!valid.some((c) => c.id === state.capture.categoryId))
-      state.capture.categoryId = valid[0] ? valid[0].id : null;
-    renderChips($('#captureChips'), state.capture.type, state.capture.categoryId, (id) => {
-      state.capture.categoryId = id; renderCapture();
+      level1(group).forEach((l1) => {
+        const kids = childrenOf(l1.id);
+        const hasKids = kids.length > 0;
+        const expanded = expandedParentId === l1.id;
+        const selectedHere = selectedId === l1.id || kids.some((k) => k.id === selectedId);
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'catl1'
+          + (selectedId === l1.id ? ' is-active' : '')
+          + (selectedHere ? ' has-sel' : '')
+          + (expanded ? ' is-open' : '');
+        btn.style.setProperty('--chip', l1.color);
+        btn.innerHTML = `<span class="chip__icon">${l1.icon || ''}</span>`
+          + `<span class="catl1__name">${escapeHtml(l1.name)}</span>`
+          + (hasKids ? `<span class="catl1__caret">${expanded ? '▾' : '▸'}</span>` : '');
+        btn.addEventListener('click', () => hasKids ? onToggleParent(l1.id) : onSelectLeaf(l1.id));
+        col.appendChild(btn);
+
+        if (hasKids && expanded) {
+          const sub = document.createElement('div');
+          sub.className = 'catl2';
+          kids.forEach((k) => {
+            const kb = document.createElement('button');
+            kb.type = 'button';
+            kb.className = 'catl2btn' + (k.id === selectedId ? ' is-active' : '');
+            kb.style.setProperty('--chip', k.color);
+            kb.innerHTML = `<span class="chip__icon">${k.icon || ''}</span>${escapeHtml(k.name)}`;
+            kb.addEventListener('click', () => onSelectLeaf(k.id));
+            sub.appendChild(kb);
+          });
+          col.appendChild(sub);
+        }
+      });
+      container.appendChild(col);
     });
   }
 
+  // ---------- Renders: Bestand & Konten ----------
+  function renderBalance() {
+    const bal = totalBalance();
+    const el = $('#balanceValue');
+    el.textContent = Money.format(bal);
+    el.classList.toggle('is-negative', bal < 0);
+    $('#balanceSub').textContent = activeAccounts().length + ' Konten';
+  }
+
+  function renderAccountSummary() {
+    const wrap = $('#captureAccSum');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    const total = document.createElement('div');
+    total.className = 'accsum__total';
+    total.innerHTML = `<span>Gesamt</span><span>${Money.format(totalBalance())}</span>`;
+    wrap.appendChild(total);
+    activeAccounts().forEach((a) => {
+      const bal = accountBalance(a.id);
+      const row = document.createElement('div');
+      row.className = 'accsum__row';
+      row.innerHTML = `<span>${escapeHtml(a.name)}</span>`
+        + `<span class="${bal < 0 ? 'neg' : ''}">${Money.format(bal)}</span>`;
+      wrap.appendChild(row);
+    });
+  }
+
+  function renderCaptureAccounts() {
+    const wrap = $('#captureAccounts');
+    if (!wrap) return;
+    if (!accountById(state.capture.accountId)) state.capture.accountId = defaultAccountId();
+    wrap.innerHTML = '';
+    activeAccounts().forEach((a) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'acctbtn' + (a.id === state.capture.accountId ? ' is-active' : '');
+      b.textContent = a.name;
+      b.addEventListener('click', () => { state.capture.accountId = a.id; renderCaptureAccounts(); });
+      wrap.appendChild(b);
+    });
+  }
+
+  function renderQuickButtons() {
+    const wrap = $('#quickButtons');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    (CONFIG.quickAmountsEuro || []).forEach((euro) => {
+      const cents = Math.round(euro * 100);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'quickbtn';
+      b.textContent = '+ ' + Money.format(cents);
+      b.addEventListener('click', () => addQuick(cents));
+      wrap.appendChild(b);
+    });
+  }
+  function addQuick(cents) {
+    const cur = Money.parse($('#amountInput').value) || 0;
+    $('#amountInput').value = Money.format(cur + cents, { withSymbol: false });
+  }
+
+  // ---------- Render: Erfassen ----------
+  function renderCapture() {
+    $$('#captureType .typebtn').forEach((b) =>
+      b.classList.toggle('is-active', b.dataset.type === state.capture.type));
+    syncCategory(state.capture, state.capture.type);
+    renderPicker($('#captureChips'), state.capture.type, state.capture.categoryId, state.capture.expandedParentId,
+      (id) => { state.capture.categoryId = id; renderCapture(); },
+      (pid) => { state.capture.expandedParentId = state.capture.expandedParentId === pid ? null : pid; renderCapture(); });
+    renderCaptureAccounts();
+    renderAccountSummary();
+  }
+
+  // ---------- Verlauf ----------
   function populateFilterCats() {
     const sel = $('#filterCat');
     if (!sel) return;
@@ -155,7 +328,8 @@
     sel.innerHTML = '<option value="all">Alle Kategorien</option>';
     state.categories.forEach((c) => {
       const o = document.createElement('option');
-      o.value = c.id; o.textContent = (c.icon ? c.icon + ' ' : '') + c.name;
+      o.value = c.id;
+      o.textContent = (c.icon ? c.icon + ' ' : '') + c.name + (c.parentId ? ' (Unter)' : '');
       sel.appendChild(o);
     });
     sel.value = state.categories.some((c) => c.id === cur) ? cur : 'all';
@@ -169,7 +343,8 @@
       if (f.cat !== 'all' && t.categoryId !== f.cat) return false;
       if (q) {
         const cat = categoryById(t.categoryId);
-        const hay = ((t.note || '') + ' ' + (cat ? cat.name : '')).toLowerCase();
+        const acc = accountById(txAccountId(t));
+        const hay = ((t.note || '') + ' ' + (cat ? cat.name : '') + ' ' + (acc ? acc.name : '')).toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -202,19 +377,22 @@
         list.appendChild(head);
       }
       const cat = categoryById(t.categoryId);
+      const acc = accountById(txAccountId(t));
+      const sub = [t.note ? escapeHtml(t.note) : '', acc ? escapeHtml(acc.name) : ''].filter(Boolean).join(' · ');
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'entry';
       row.innerHTML =
         `<span class="entry__icon" style="--chip:${cat ? cat.color : '#64748b'}">${cat ? cat.icon : '❓'}${t.recurringId ? '<span class="entry__rec">↻</span>' : ''}</span>` +
         `<span class="entry__main"><span class="entry__cat">${cat ? escapeHtml(cat.name) : 'Unbekannt'}</span>` +
-        `<span class="entry__note">${t.note ? escapeHtml(t.note) : ''}</span></span>` +
+        `<span class="entry__note">${sub}</span></span>` +
         `<span class="entry__amount ${t.type === 'income' ? 'pos' : 'neg'}">${t.type === 'income' ? '+' : '−'}${Money.format(t.amountCents, { withSymbol: false })} €</span>`;
       row.addEventListener('click', () => openEdit(t));
       list.appendChild(row);
     });
   }
 
+  // ---------- Monatsübersicht (nur Buchungen, keine Transfers) ----------
   function renderStats() {
     const m = todayISO().slice(0, 7);
     $('#statMonth').textContent = new Date(m + '-01T00:00:00')
@@ -254,17 +432,23 @@
   function renderCategoryList() {
     const cl = $('#categoryListMore');
     cl.innerHTML = '';
-    state.categories.forEach((c) => {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'catitem' + (c.archived ? ' is-archived' : '');
-      item.innerHTML =
-        `<span class="entry__icon" style="--chip:${c.color}">${c.icon || ''}</span>` +
-        `<span>${escapeHtml(c.name)}</span>` +
-        `<span class="muted">${c.archived ? 'archiviert' : (c.type === 'income' ? 'Einnahme' : c.type === 'both' ? 'beides' : 'Ausgabe')}</span>`;
-      item.addEventListener('click', () => openCatEdit(c));
-      cl.appendChild(item);
-    });
+    [...state.categories]
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .forEach((c) => {
+        const parent = c.parentId ? categoryById(c.parentId) : null;
+        const where = c.type === 'income' ? 'Einnahme'
+          : c.type === 'both' ? 'beides'
+            : parent ? (c.group + ' › ' + parent.name) : (c.group || 'Ausgabe');
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'catitem' + (c.archived ? ' is-archived' : '') + (c.parentId ? ' is-child' : '');
+        item.innerHTML =
+          `<span class="entry__icon" style="--chip:${c.color}">${c.icon || ''}</span>` +
+          `<span>${escapeHtml(c.name)}</span>` +
+          `<span class="muted">${c.archived ? 'archiviert' : escapeHtml(where)}</span>`;
+        item.addEventListener('click', () => openCatEdit(c));
+        cl.appendChild(item);
+      });
   }
 
   function renderRecurringList() {
@@ -273,15 +457,17 @@
     if (state.recurring.length === 0) { rl.innerHTML = '<p class="muted">Noch keine Regeln.</p>'; return; }
     state.recurring.forEach((r) => {
       const cat = categoryById(r.categoryId);
+      const acc = accountById(r.accountId);
       let when = INTERVAL_LABELS[r.interval] || r.interval;
       if (r.interval === 'weekly') when += ', ' + (WEEKDAYS.find((w) => w.v === r.anchorDay) || {}).l;
       if (r.interval === 'monthly') when += ', Tag ' + r.anchorDay;
+      if (acc) when += ' · ' + acc.name;
       const item = document.createElement('button');
       item.type = 'button';
       item.className = 'catitem' + (r.active ? '' : ' is-archived');
       item.innerHTML =
         `<span class="entry__icon" style="--chip:${cat ? cat.color : '#64748b'}">${cat ? cat.icon : '↻'}</span>` +
-        `<span><span>${escapeHtml((cat ? cat.name : '?') )}</span><br><span class="muted">${when}</span></span>` +
+        `<span><span>${escapeHtml((cat ? cat.name : '?'))}</span><br><span class="muted">${escapeHtml(when)}</span></span>` +
         `<span class="entry__amount ${r.type === 'income' ? 'pos' : 'neg'}">${r.type === 'income' ? '+' : '−'}${Money.format(r.amountCents, { withSymbol: false })} €</span>`;
       item.addEventListener('click', () => openRecurEdit(r));
       rl.appendChild(item);
@@ -289,61 +475,185 @@
   }
 
   function renderMore() {
-    const s = state.settings || {};
-    $('#startInput').value = Money.format(s.startBalanceCents || 0, { withSymbol: false });
-    $('#startMode').textContent = s.mode === 'monthly'
-      ? 'Modus: monatlich neu (jeder Monat startet mit diesem Wert).'
-      : 'Modus: einmalig (läuft fortlaufend).';
     renderStats();
     renderCategoryList();
     renderRecurringList();
   }
 
-  // ---------- Erfassen / Bestand ----------
+  // ---------- Konten-Ansicht ----------
+  function renderAccountOverview() {
+    const wrap = $('#accountOverview');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    activeAccounts().forEach((a) => {
+      const bal = accountBalance(a.id);
+      const row = document.createElement('div');
+      row.className = 'statrow';
+      row.innerHTML = `<span>${escapeHtml(a.name)}</span><span class="${bal < 0 ? 'neg' : 'pos'}">${Money.format(bal)}</span>`;
+      wrap.appendChild(row);
+    });
+    const total = document.createElement('div');
+    total.className = 'statrow statrow--total';
+    total.innerHTML = `<span>Gesamt</span><span>${Money.format(totalBalance())}</span>`;
+    wrap.appendChild(total);
+  }
+
+  function fillAccountSelect(sel, selectedId) {
+    if (!sel) return;
+    sel.innerHTML = '';
+    activeAccounts().forEach((a) => {
+      const o = document.createElement('option');
+      o.value = a.id; o.textContent = a.name;
+      sel.appendChild(o);
+    });
+    if (selectedId && accountById(selectedId)) sel.value = selectedId;
+  }
+
+  function renderTransferControls() {
+    const accs = activeAccounts();
+    fillAccountSelect($('#transferFrom'), $('#transferFrom').value || defaultAccountId());
+    fillAccountSelect($('#transferTo'), $('#transferTo').value || (accs[1] ? accs[1].id : (accs[0] ? accs[0].id : '')));
+    if (!$('#transferDate').value) $('#transferDate').value = todayISO();
+  }
+
+  function renderTransferList() {
+    const wrap = $('#transferList');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    if (state.transfers.length === 0) { wrap.innerHTML = '<p class="muted">Noch keine Umbuchungen.</p>'; return; }
+    const sorted = [...state.transfers].sort((a, b) =>
+      a.date === b.date ? (b.createdAt || '').localeCompare(a.createdAt || '') : b.date.localeCompare(a.date));
+    sorted.slice(0, 30).forEach((tr) => {
+      const from = accountById(tr.fromAccountId);
+      const to = accountById(tr.toAccountId);
+      const item = document.createElement('div');
+      item.className = 'catitem';
+      item.innerHTML =
+        `<span class="entry__icon" style="--chip:#0f766e">🔁</span>` +
+        `<span><span>${escapeHtml(from ? from.name : '?')} → ${escapeHtml(to ? to.name : '?')}</span>` +
+        `<br><span class="muted">${dateLabel(tr.date)}${tr.note ? ' · ' + escapeHtml(tr.note) : ''}</span></span>` +
+        `<span class="entry__amount">${Money.format(tr.amountCents, { withSymbol: false })} €</span>`;
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'btn btn--sm danger';
+      del.textContent = '✕';
+      del.addEventListener('click', () => deleteTransfer(tr.id));
+      item.appendChild(del);
+      wrap.appendChild(item);
+    });
+  }
+
+  function renderStartBalanceList() {
+    const wrap = $('#startBalanceList');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    activeAccounts().forEach((a) => {
+      const row = document.createElement('div');
+      row.className = 'startrow';
+      row.innerHTML = `<span class="startrow__name">${escapeHtml(a.name)}</span>`;
+      const input = document.createElement('input');
+      input.className = 'field';
+      input.inputMode = 'decimal';
+      input.value = Money.format(a.startBalanceCents || 0, { withSymbol: false });
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn--sm';
+      btn.textContent = 'Sichern';
+      btn.addEventListener('click', () => saveStartBalance(a.id, input.value));
+      row.appendChild(input);
+      row.appendChild(btn);
+      wrap.appendChild(row);
+    });
+  }
+
+  function renderAccounts() {
+    renderAccountOverview();
+    renderTransferControls();
+    renderTransferList();
+    renderStartBalanceList();
+  }
+
+  // nach Änderungen, die Bestände betreffen
+  function refreshBalances() {
+    renderBalance();
+    renderAccountSummary();
+    renderAccountOverview();
+  }
+
+  // ---------- Erfassen speichern ----------
   async function saveCapture(e) {
     e.preventDefault();
     const cents = Money.parse($('#amountInput').value);
     if (!cents || cents <= 0) { toast('Bitte gültigen Betrag eingeben'); return; }
     if (!state.capture.categoryId) { toast('Bitte Kategorie wählen'); return; }
+    if (!state.capture.accountId) { toast('Bitte Konto wählen'); return; }
     const t = {
       id: DB.uuid(), date: $('#dateInput').value || todayISO(),
       amountCents: cents, type: state.capture.type, categoryId: state.capture.categoryId,
+      accountId: state.capture.accountId,
       note: $('#noteInput').value.trim(), recurringId: null, createdAt: new Date().toISOString(),
     };
     await DB.putTransaction(t);
     state.transactions.push(t);
     $('#amountInput').value = ''; $('#noteInput').value = '';
-    renderBalance(); renderHistory();
+    refreshBalances(); renderHistory();
     toast('Gespeichert ✓');
   }
 
-  async function saveStart() {
-    const cents = Money.parse($('#startInput').value);
+  async function saveStartBalance(accId, value) {
+    const cents = Money.parse(value);
     if (cents == null) { toast('Bitte gültigen Betrag'); return; }
-    state.settings.startBalanceCents = cents;
-    await DB.setSettings(state.settings);
-    renderBalance();
+    const acc = accountById(accId);
+    if (!acc) return;
+    acc.startBalanceCents = cents;
+    await DB.putAccount(acc);
+    refreshBalances();
     toast('Anfangsbestand gesichert ✓');
+  }
+
+  // ---------- Transfer ----------
+  async function saveTransfer() {
+    const cents = Money.parse($('#transferAmount').value);
+    if (!cents || cents <= 0) { toast('Bitte gültigen Betrag'); return; }
+    const fromId = $('#transferFrom').value;
+    const toId = $('#transferTo').value;
+    if (!fromId || !toId) { toast('Bitte Konten wählen'); return; }
+    if (fromId === toId) { toast('Von- und Auf-Konto müssen verschieden sein'); return; }
+    const tr = {
+      id: DB.uuid(), date: $('#transferDate').value || todayISO(),
+      amountCents: cents, fromAccountId: fromId, toAccountId: toId,
+      note: $('#transferNote').value.trim(), createdAt: new Date().toISOString(),
+    };
+    await DB.putTransfer(tr);
+    state.transfers.push(tr);
+    $('#transferAmount').value = ''; $('#transferNote').value = '';
+    refreshBalances(); renderTransferList();
+    toast('Umgebucht ✓');
+  }
+  async function deleteTransfer(id) {
+    await DB.deleteTransfer(id);
+    state.transfers = state.transfers.filter((x) => x.id !== id);
+    refreshBalances(); renderTransferList();
+    toast('Umbuchung gelöscht');
   }
 
   // ---------- Eintrag bearbeiten ----------
   function openEdit(t) {
-    state.edit = { id: t.id, type: t.type, categoryId: t.categoryId };
+    state.edit = { id: t.id, type: t.type, categoryId: t.categoryId, expandedParentId: null, accountId: txAccountId(t) };
     $('#editAmount').value = Money.format(t.amountCents, { withSymbol: false });
     $('#editDate').value = t.date;
     $('#editNote').value = t.note || '';
+    fillAccountSelect($('#editAccount'), state.edit.accountId);
     renderEditOverlay();
     $('#editOverlay').hidden = false;
   }
   function renderEditOverlay() {
     $$('#editType .typebtn').forEach((b) =>
       b.classList.toggle('is-active', b.dataset.type === state.edit.type));
-    const valid = categoriesForType(state.edit.type);
-    if (!valid.some((c) => c.id === state.edit.categoryId))
-      state.edit.categoryId = valid[0] ? valid[0].id : null;
-    renderChips($('#editChips'), state.edit.type, state.edit.categoryId, (id) => {
-      state.edit.categoryId = id; renderEditOverlay();
-    });
+    syncCategory(state.edit, state.edit.type);
+    renderPicker($('#editChips'), state.edit.type, state.edit.categoryId, state.edit.expandedParentId,
+      (id) => { state.edit.categoryId = id; renderEditOverlay(); },
+      (pid) => { state.edit.expandedParentId = state.edit.expandedParentId === pid ? null : pid; renderEditOverlay(); });
   }
   const closeEdit = () => { $('#editOverlay').hidden = true; state.edit.id = null; };
 
@@ -354,16 +664,17 @@
     const t = state.transactions.find((x) => x.id === state.edit.id);
     if (!t) return;
     t.amountCents = cents; t.type = state.edit.type; t.categoryId = state.edit.categoryId;
+    t.accountId = $('#editAccount').value || state.edit.accountId;
     t.date = $('#editDate').value || t.date; t.note = $('#editNote').value.trim();
     await DB.putTransaction(t);
-    closeEdit(); renderBalance(); renderHistory();
+    closeEdit(); refreshBalances(); renderHistory();
     toast('Aktualisiert ✓');
   }
   async function deleteEdit() {
     const id = state.edit.id; if (!id) return;
     await DB.deleteTransaction(id);
     state.transactions = state.transactions.filter((x) => x.id !== id);
-    closeEdit(); renderBalance(); renderHistory();
+    closeEdit(); refreshBalances(); renderHistory();
     toast('Gelöscht');
   }
 
@@ -380,6 +691,32 @@
       wrap.appendChild(s);
     });
   }
+  function populateCatSelects(current) {
+    const gsel = $('#catGroup');
+    gsel.innerHTML = '';
+    const groups = expenseGroups();
+    (CONFIG.categoryTree || []).forEach((c) => { if (!groups.includes(c.column)) groups.push(c.column); });
+    groups.forEach((g) => {
+      const o = document.createElement('option'); o.value = g; o.textContent = g; gsel.appendChild(o);
+    });
+    const psel = $('#catParent');
+    psel.innerHTML = '<option value="">— (Ebene 1)</option>';
+    state.categories
+      .filter((c) => c.type === 'expense' && !c.parentId && (!current || c.id !== current.id))
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .forEach((c) => {
+        const o = document.createElement('option');
+        o.value = c.id; o.textContent = (c.group ? c.group + ' › ' : '') + c.name;
+        psel.appendChild(o);
+      });
+  }
+  function updateCatRowsVisibility() {
+    const isExpense = $('#catType').value === 'expense';
+    const hasParent = isExpense && $('#catParent').value;
+    $('#catParentRow').hidden = !isExpense;
+    // Spalte nur relevant für Ebene-1-Ausgaben; bei gewähltem Elternknoten wird Spalte vererbt.
+    $('#catGroupRow').hidden = !isExpense || !!hasParent;
+  }
   function openCatEdit(cat) {
     const isNew = !cat;
     state.cat.id = isNew ? null : cat.id;
@@ -390,6 +727,10 @@
     $('#catType').value = isNew ? 'expense' : cat.type;
     $('#catArchived').checked = isNew ? false : !!cat.archived;
     $('#catDelete').hidden = isNew;
+    populateCatSelects(cat);
+    $('#catGroup').value = isNew ? (expenseGroups()[0] || (CONFIG.categoryTree[0] || {}).column || '') : (cat.group || '');
+    $('#catParent').value = isNew ? '' : (cat.parentId || '');
+    updateCatRowsVisibility();
     renderSwatches();
     $('#catOverlay').hidden = false;
   }
@@ -398,13 +739,21 @@
   async function saveCat() {
     const name = $('#catName').value.trim();
     if (!name) { toast('Bitte Name eingeben'); return; }
+    const type = $('#catType').value;
     const existing = state.cat.id ? state.categories.find((c) => c.id === state.cat.id) : null;
+    let parentId = null, group = null;
+    if (type === 'expense') {
+      parentId = $('#catParent').value || null;
+      const parent = parentId ? categoryById(parentId) : null;
+      group = parent ? parent.group : ($('#catGroup').value || null);
+    }
     const cat = {
       id: state.cat.id || DB.uuid(),
       name, icon: $('#catIcon').value.trim(), color: state.cat.color,
-      type: $('#catType').value, archived: $('#catArchived').checked,
+      type, group, parentId,
+      order: existing ? (existing.order || 0) : (state.categories.length + 1) * 10,
+      archived: $('#catArchived').checked,
     };
-    if (existing) Object.assign(existing, cat);
     await DB.putCategory(cat);
     state.categories = await DB.listCategories();
     closeCat(); renderCapture(); renderHistory(); renderMore(); populateFilterCats();
@@ -412,6 +761,9 @@
   }
   async function deleteCat() {
     const id = state.cat.id; if (!id) return;
+    // Untergeordnete Kategorien mitlöschen.
+    const kids = state.categories.filter((c) => c.parentId === id);
+    for (const k of kids) await DB.deleteCategory(k.id);
     await DB.deleteCategory(id);
     state.categories = await DB.listCategories();
     closeCat(); renderCapture(); renderHistory(); renderMore(); populateFilterCats();
@@ -445,8 +797,11 @@
     state.recur.id = isNew ? null : rule.id;
     state.recur.type = isNew ? 'expense' : rule.type;
     state.recur.categoryId = isNew ? null : rule.categoryId;
+    state.recur.expandedParentId = null;
+    state.recur.accountId = isNew ? defaultAccountId() : (rule.accountId || defaultAccountId());
     $('#recurAmount').value = isNew ? '' : Money.format(rule.amountCents, { withSymbol: false });
     $('#recurNote').value = isNew ? '' : (rule.note || '');
+    fillAccountSelect($('#recurAccount'), state.recur.accountId);
     $('#recurInterval').value = isNew ? (CONFIG.recurring.enabledIntervals || ['monthly'])[0] : rule.interval;
     $('#recurWeekday').value = String(isNew ? 1 : (rule.interval === 'weekly' ? rule.anchorDay : 1));
     $('#recurDay').value = isNew ? '1' : (rule.interval === 'monthly' ? rule.anchorDay : '1');
@@ -461,12 +816,10 @@
   function renderRecurOverlay() {
     $$('#recurType .typebtn').forEach((b) =>
       b.classList.toggle('is-active', b.dataset.type === state.recur.type));
-    const valid = categoriesForType(state.recur.type);
-    if (!valid.some((c) => c.id === state.recur.categoryId))
-      state.recur.categoryId = valid[0] ? valid[0].id : null;
-    renderChips($('#recurChips'), state.recur.type, state.recur.categoryId, (id) => {
-      state.recur.categoryId = id; renderRecurOverlay();
-    });
+    syncCategory(state.recur, state.recur.type);
+    renderPicker($('#recurChips'), state.recur.type, state.recur.categoryId, state.recur.expandedParentId,
+      (id) => { state.recur.categoryId = id; renderRecurOverlay(); },
+      (pid) => { state.recur.expandedParentId = state.recur.expandedParentId === pid ? null : pid; renderRecurOverlay(); });
   }
   const closeRecur = () => { $('#recurOverlay').hidden = true; state.recur.id = null; };
 
@@ -482,10 +835,10 @@
     const rule = {
       id: state.recur.id || DB.uuid(),
       amountCents: cents, type: state.recur.type, categoryId: state.recur.categoryId,
+      accountId: $('#recurAccount').value || defaultAccountId(),
       note: $('#recurNote').value.trim(), interval: iv, anchorDay: anchor,
       startDate: $('#recurStart').value || todayISO(),
       endDate: $('#recurEnd').value || null,
-      // beim Bearbeiten lastRun erhalten, sonst neu (rückwirkend ab Start erzeugen)
       lastRun: existing ? existing.lastRun : null,
       active: $('#recurActive').checked,
     };
@@ -506,13 +859,13 @@
     await generateDueRecurring();
     state.recurring = await DB.listRecurring();
     state.transactions = await DB.listTransactions();
-    renderBalance(); renderHistory(); renderMore();
+    refreshBalances(); renderHistory(); renderMore();
   }
 
   // ---------- Daten: Export / Import ----------
   async function exportCsv() {
     if (state.transactions.length === 0) { toast('Keine Daten zum Exportieren'); return; }
-    const res = await Exporter.exportCSV(state.transactions, state.categories);
+    const res = await Exporter.exportCSV(state.transactions, state.categories, state.accounts);
     if (res !== 'cancelled') toast('CSV bereit ✓');
   }
   async function exportBackup() {
@@ -528,11 +881,13 @@
       if (!window.confirm(`Backup laden? Alle aktuellen Daten werden ersetzt (${n} Einträge im Backup).`)) return;
       await DB.importAll(data);
       state.settings = await DB.getSettings();
+      state.accounts = await DB.listAccounts();
       state.categories = await DB.listCategories();
       state.transactions = await DB.listTransactions();
+      state.transfers = await DB.listTransfers();
       state.recurring = await DB.listRecurring();
       populateFilterCats();
-      renderBalance(); renderCapture(); renderHistory(); renderMore();
+      refreshBalances(); renderCapture(); renderHistory(); renderAccounts(); renderMore();
       toast('Backup geladen ✓');
     } catch (e) {
       console.error(e); toast('Import fehlgeschlagen: ' + e.message);
@@ -543,6 +898,8 @@
   function showView(name) {
     $$('.view').forEach((v) => { v.hidden = v.dataset.view !== name; });
     $$('.tab').forEach((tb) => tb.classList.toggle('is-active', tb.dataset.goto === name));
+    if (name === 'capture') renderAccountSummary();
+    if (name === 'accounts') renderAccounts();
     if (name === 'more') renderMore();
   }
 
@@ -555,7 +912,10 @@
       state.capture.type = b.dataset.type; renderCapture();
     });
     $('#captureForm').addEventListener('submit', saveCapture);
-    $('#saveStartBtn').addEventListener('click', saveStart);
+    $('#clearAmountBtn').addEventListener('click', () => { $('#amountInput').value = ''; });
+
+    // Konten / Transfer
+    $('#transferSaveBtn').addEventListener('click', saveTransfer);
 
     // Eintrag-Overlay
     $('#editType').addEventListener('click', (e) => {
@@ -569,6 +929,8 @@
 
     // Kategorie-Overlay
     $('#addCatBtn').addEventListener('click', () => openCatEdit(null));
+    $('#catType').addEventListener('change', updateCatRowsVisibility);
+    $('#catParent').addEventListener('change', updateCatRowsVisibility);
     $('#catSave').addEventListener('click', saveCat);
     $('#catDelete').addEventListener('click', deleteCat);
     $('#catCancel').addEventListener('click', closeCat);
@@ -605,20 +967,23 @@
     applyTheme();
     await DB.open();
     await DB.ensureSeed(CONFIG);
-    await generateDueRecurring();
     state.settings = await DB.getSettings();
+    state.accounts = await DB.listAccounts();
     state.categories = await DB.listCategories();
+    state.transfers = await DB.listTransfers();
+    await generateDueRecurring();
     state.transactions = await DB.listTransactions();
     state.recurring = await DB.listRecurring();
 
+    state.capture.accountId = defaultAccountId();
     $('#dateInput').value = todayISO();
     buildIntervalSelect();
     populateFilterCats();
+    renderQuickButtons();
     wireEvents();
     renderBalance();
     renderCapture();
     renderHistory();
-    renderMore();
     showView(CONFIG.ui.defaultView || 'capture');
   }
 

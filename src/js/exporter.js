@@ -8,18 +8,28 @@ const Exporter = (() => {
   }
 
   // transactions -> CSV-String (deutsch: Semikolon, Komma-Dezimal, mit BOM für Excel)
-  function toCSV(transactions, categories) {
+  function toCSV(transactions, categories, accounts) {
     const catName = (id) => {
       const c = categories.find((x) => x.id === id);
-      return c ? c.name : 'Unbekannt';
+      if (!c) return 'Unbekannt';
+      if (c.parentId) {
+        const p = categories.find((x) => x.id === c.parentId);
+        return (p ? p.name + ' / ' : '') + c.name;
+      }
+      return c.name;
     };
-    const head = ['Datum', 'Typ', 'Kategorie', 'Betrag', 'Notiz'];
+    const accName = (id) => {
+      const a = (accounts || []).find((x) => x.id === id);
+      return a ? a.name : '';
+    };
+    const head = ['Datum', 'Typ', 'Kategorie', 'Konto', 'Betrag', 'Notiz'];
     const rows = [...transactions]
       .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
       .map((t) => [
         t.date,
         t.type === 'income' ? 'Einnahme' : 'Ausgabe',
         catName(t.categoryId),
+        accName(t.accountId),
         Money.format(t.amountCents, { withSymbol: false }),
         t.note || '',
       ].map(csvEscape).join(';'));
@@ -46,8 +56,8 @@ const Exporter = (() => {
     return 'downloaded';
   }
 
-  async function exportCSV(transactions, categories) {
-    return deliver(`cashcount-${tsStamp()}.csv`, toCSV(transactions, categories), 'text/csv');
+  async function exportCSV(transactions, categories, accounts) {
+    return deliver(`cashcount-${tsStamp()}.csv`, toCSV(transactions, categories, accounts), 'text/csv');
   }
 
   async function exportBackup(backupObj) {

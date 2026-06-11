@@ -13,9 +13,9 @@
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <!-- Bestand -->
+  <!-- Bestand (Summe aller Konten) -->
   <header class="balance" id="balance">
-    <span class="balance__label">Aktueller Bestand</span>
+    <span class="balance__label">Bestand gesamt</span>
     <span class="balance__value" id="balanceValue">–</span>
     <span class="balance__sub" id="balanceSub"></span>
   </header>
@@ -27,14 +27,22 @@
         <div class="amount">
           <input id="amountInput" class="amount__input" inputmode="decimal" placeholder="0,00" aria-label="Betrag">
           <span class="amount__cur">€</span>
+          <button type="button" class="amount__clear" id="clearAmountBtn" aria-label="Betrag löschen">✕</button>
         </div>
+
+        <!-- Schnell-Eingabe (addiert sich) -->
+        <div class="quick" id="quickButtons"></div>
 
         <div class="typetoggle" id="captureType">
           <button type="button" class="typebtn" data-type="expense">Ausgabe</button>
           <button type="button" class="typebtn" data-type="income">Einnahme</button>
         </div>
 
-        <div class="chips" id="captureChips"></div>
+        <!-- Kategorie-Auswahl (Spalten/Hierarchie bei Ausgaben, Chips bei Einnahmen) -->
+        <div class="picker" id="captureChips"></div>
+
+        <!-- Konto-Auswahl -->
+        <div class="acctpick" id="captureAccounts" aria-label="Konto"></div>
 
         <div class="row">
           <input type="date" id="dateInput" class="field" aria-label="Datum">
@@ -45,6 +53,9 @@
 
         <button type="submit" class="save" id="saveBtn">Speichern</button>
         <p class="toast" id="toast" hidden></p>
+
+        <!-- Kleine Konten-Summe -->
+        <div class="accsum" id="captureAccSum"></div>
       </form>
     </section>
 
@@ -64,6 +75,45 @@
       <div id="historyList"></div>
     </section>
 
+    <!-- KONTEN -->
+    <section class="view" data-view="accounts" hidden>
+      <div class="card">
+        <h2>Konten-Übersicht</h2>
+        <div id="accountOverview" class="accov"></div>
+      </div>
+
+      <div class="card">
+        <h2>Transfer / Ein- &amp; Auszahlung</h2>
+        <p class="muted">Verschiebt Geld zwischen Konten (z. B. Bargeld einzahlen = Bar → Bank). Zählt nicht als Einnahme/Ausgabe.</p>
+        <div class="amount amount--sm">
+          <input id="transferAmount" class="amount__input" inputmode="decimal" placeholder="0,00" aria-label="Betrag">
+          <span class="amount__cur">€</span>
+        </div>
+        <label class="fieldlabel">Von Konto
+          <select id="transferFrom" class="field"></select>
+        </label>
+        <label class="fieldlabel">Auf Konto
+          <select id="transferTo" class="field"></select>
+        </label>
+        <label class="fieldlabel">Datum
+          <input type="date" id="transferDate" class="field">
+        </label>
+        <input id="transferNote" class="field" placeholder="Notiz (optional)">
+        <button type="button" class="save" id="transferSaveBtn">Umbuchen</button>
+      </div>
+
+      <div class="card">
+        <h2>Letzte Umbuchungen</h2>
+        <div id="transferList" class="catlist"></div>
+      </div>
+
+      <div class="card">
+        <h2>Anfangsbestände</h2>
+        <p class="muted">Startwert je Konto (läuft durchlaufend, kein monatliches Zurücksetzen).</p>
+        <div id="startBalanceList" class="catlist"></div>
+      </div>
+    </section>
+
     <!-- MEHR -->
     <section class="view" data-view="more" hidden>
       <div class="card">
@@ -72,15 +122,6 @@
         <div class="statrow"><span>Ausgaben</span><span class="neg" id="statExpense">–</span></div>
         <div class="statrow statrow--total"><span>Saldo Monat</span><span id="statNet">–</span></div>
         <div id="statByCat" class="statcats"></div>
-      </div>
-
-      <div class="card">
-        <h2>Anfangsbestand</h2>
-        <div class="row">
-          <input id="startInput" class="field" inputmode="decimal" placeholder="0,00">
-          <button type="button" class="btn" id="saveStartBtn">Sichern</button>
-        </div>
-        <p class="muted" id="startMode"></p>
       </div>
 
       <div class="card">
@@ -117,6 +158,7 @@
   <nav class="tabbar">
     <button class="tab is-active" data-goto="capture">➕<span>Erfassen</span></button>
     <button class="tab" data-goto="history">📒<span>Verlauf</span></button>
+    <button class="tab" data-goto="accounts">🏦<span>Konten</span></button>
     <button class="tab" data-goto="more">⚙️<span>Mehr</span></button>
   </nav>
 
@@ -132,7 +174,10 @@
         <button type="button" class="typebtn" data-type="expense">Ausgabe</button>
         <button type="button" class="typebtn" data-type="income">Einnahme</button>
       </div>
-      <div class="chips" id="editChips"></div>
+      <div class="picker" id="editChips"></div>
+      <label class="fieldlabel">Konto
+        <select id="editAccount" class="field"></select>
+      </label>
       <div class="row"><input type="date" id="editDate" class="field"></div>
       <div class="row"><input type="text" id="editNote" class="field" placeholder="Notiz (optional)"></div>
       <div class="sheet__actions">
@@ -157,6 +202,12 @@
         <option value="income">Einnahme</option>
         <option value="both">beides</option>
       </select>
+      <label class="fieldlabel" id="catGroupRow">Spalte (nur Ausgaben)
+        <select id="catGroup" class="field"></select>
+      </label>
+      <label class="fieldlabel" id="catParentRow">Übergeordnet (optional)
+        <select id="catParent" class="field"></select>
+      </label>
       <label class="check"><input type="checkbox" id="catArchived"> Archiviert (ausgeblendet)</label>
       <div class="sheet__actions">
         <button type="button" class="btn danger" id="catDelete">Löschen</button>
@@ -178,7 +229,10 @@
         <button type="button" class="typebtn" data-type="expense">Ausgabe</button>
         <button type="button" class="typebtn" data-type="income">Einnahme</button>
       </div>
-      <div class="chips" id="recurChips"></div>
+      <div class="picker" id="recurChips"></div>
+      <label class="fieldlabel">Konto
+        <select id="recurAccount" class="field"></select>
+      </label>
       <input id="recurNote" class="field" placeholder="Notiz (optional)">
       <label class="fieldlabel">Intervall
         <select id="recurInterval" class="field"></select>
