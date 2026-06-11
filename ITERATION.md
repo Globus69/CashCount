@@ -147,7 +147,8 @@ Ebene-1-Kategorie mit Kindern klappt Ebene 2 auf.
 - Clear-Button neben der angezeigten Summe.
 
 ### Offen / später
-- Ebene-2 für Einkauf-Kategorien, weitere Sonstiges-Einträge, Icon-Recolor (Rot/Orange).
+- ~~Ebene-2 für Einkauf-Kategorien, weitere Sonstiges-Einträge, Icon-Recolor (Rot/Orange)~~
+  → erledigt bzw. geklärt in Iteration 6 (s. u.)
 
 
 ## Iteration 5 — Kompakt-Layout, Statistik & Prognose (umgesetzt 2026-06-11)
@@ -181,3 +182,31 @@ Original-Anforderungen:
 - Sei kreativ und mach mir auch noch mal eine Seite mit statistischen Auswertungen in den übersichtlich und besten und schönsten Wägen die du findest und für dich erdenken kannst.
 
 - Gib in einer separaten Anzeige auf dem Display bei der Eingabe unter oder neben oder wie auch immer angeordnet, Eine Vorschau auf die nächsten drei Monate wie sich anhand der wiederkehrenden Einnahmen und Außenabgaben Der Kontobestand entwickeln wird.
+
+
+
+## Iteration 6 — Offene Punkte & Config-Abgleich (umgesetzt 2026-06-11)
+
+Per Spokenly geklärt und umgesetzt:
+
+- [x] **App-Icon in Rot/Orange** (Motiv Euro-Münze bleibt; Verlauf Orange → dunkles Rot,
+      orange-rotes €) — alle 4 Größen neu generiert
+- [x] **Ebene 2 für Lebensmittel**: Supermarkt, Bäcker (weitere ergänzt der User
+      später selbst in `config.js`)
+- [x] **Sonstiges-Spalte**: bleibt vorerst nur „Geschenk" (User ergänzt später selbst)
+- [x] **Config-Abgleich** (`syncConfigCategories`): in `config.js` NEU eingetragene
+      Kategorien werden beim App-Start auch auf Bestandsgeräten ergänzt (Abgleich über
+      Name + Spalte/Elternknoten). Bestehende/archivierte Einträge werden nie verändert —
+      Voraussetzung dafür, dass „später selbst in der Konfiguration" funktioniert
+- [x] **Nur-vertikales Scrollen** auf dem Mobilgerät: horizontales Ausweichen/Bouncen
+      unterbunden (`overflow-x: hidden`, `touch-action: pan-y`, `overscroll-behavior`)
+- [x] Service-Worker v9
+
+## Eingegangen (zu klären)
+- **Geräte-Sync** (iPhone ↔ Laptop, automatisch im Zeitintervall und/oder Refresh-Button):
+  braucht eine Cloud-Komponente und widerspricht damit der bisherigen Grundsatzentscheidung
+  „kein Backend, Daten nur lokal" → Klärung mit dem User, welcher Weg gewünscht ist.
+
+Original-Anforderungen:
+- Auf dem Mobilgerät darf beim scrollen der Bildschirm nicht seitlich ausweichen und dann Teile des Bildschirms verdecken beziehungsweise freie Stellenanzeigen wenn andere Bereiche verdeckt sind. Sozusagen eines statischessscrollen nur Vertikal.
+- Die Daten müssen sich auf dem Mobilgerät und dem Laptop synchronisieren. Automatisch in Zeitintervall und oder mit einem Refresh Button

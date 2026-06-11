@@ -50,11 +50,19 @@ const CONFIG = {
   // Ebene-1-Einträge (items). Ein Eintrag kann "children" (Ebene 2) haben;
   // dann wird beim Antippen die zweite Ebene aufgeklappt und dort gebucht.
   // icon: Emoji, color: Hex.
+  //
+  // WICHTIG: Hier NEU eingetragene Kategorien werden beim nächsten App-Start
+  // automatisch ergänzt (auch auf Geräten mit vorhandenen Daten). Bestehende
+  // Kategorien werden dabei nie verändert oder gelöscht — Umbenennen/Löschen
+  // machst du direkt in der App (Mehr -> Kategorien).
   categoryTree: [
     {
       column: "Einkauf",
       items: [
-        { name: "Lebensmittel", icon: "🛒", color: "#22c55e" },
+        { name: "Lebensmittel", icon: "🛒", color: "#22c55e", children: [
+          { name: "Supermarkt", icon: "🛒", color: "#22c55e" },
+          { name: "Bäcker",     icon: "🥐", color: "#eab308" },
+        ] },
         { name: "Haushalt",     icon: "🧺", color: "#3b82f6" },
         { name: "Kleidung",     icon: "👕", color: "#a855f7" },
         { name: "Sonstiges",    icon: "📦", color: "#64748b" },

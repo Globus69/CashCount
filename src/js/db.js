@@ -181,6 +181,49 @@ const DB = (() => {
         }
       }
     }
+    await syncConfigCategories(config);
+  }
+
+  // Konfig-Abgleich: in CONFIG.categoryTree/incomeCategories NEU eingetragene
+  // Kategorien werden auch auf Bestandsgeräten ergänzt (Abgleich über Name +
+  // Spalte bzw. Elternknoten). Bestehende Einträge werden nie verändert —
+  // auch archivierte nicht (bewusst ausgeblendet bleibt ausgeblendet).
+  async function syncConfigCategories(config) {
+    const cats = await listCategories();
+    let order = cats.reduce((m, c) => Math.max(m, c.order || 0), 0) + 10;
+    for (const col of (config.categoryTree || [])) {
+      for (const item of (col.items || [])) {
+        let parent = cats.find((c) =>
+          c.type !== 'income' && !c.parentId && c.group === col.column && c.name === item.name);
+        if (!parent) {
+          parent = sanitizeCategory({
+            id: uuid(), name: item.name, icon: item.icon || '', color: item.color || '#64748b',
+            type: 'expense', group: col.column, parentId: null, order: order, archived: false,
+          });
+          order += 10;
+          await putCategory(parent);
+          cats.push(parent);
+        }
+        for (const ch of (item.children || [])) {
+          if (cats.some((c) => c.parentId === parent.id && c.name === ch.name)) continue;
+          const rec = sanitizeCategory({
+            id: uuid(), name: ch.name, icon: ch.icon || '', color: ch.color || parent.color,
+            type: 'expense', group: col.column, parentId: parent.id, order: order, archived: false,
+          });
+          order += 10;
+          await putCategory(rec);
+          cats.push(rec);
+        }
+      }
+    }
+    for (const inc of (config.incomeCategories || [])) {
+      if (cats.some((c) => c.type === 'income' && c.name === inc.name)) continue;
+      await putCategory(sanitizeCategory({
+        id: uuid(), name: inc.name, icon: inc.icon || '', color: inc.color || '#16a34a',
+        type: 'income', group: null, parentId: null, order: order, archived: false,
+      }));
+      order += 10;
+    }
   }
 
   // --- Export / Import (Backup) ---
