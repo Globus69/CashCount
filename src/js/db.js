@@ -107,9 +107,25 @@ const DB = (() => {
     return records;
   }
 
-  // Beim ersten Start: Konten, Kategorien & Settings aus CONFIG anlegen.
+  function localToday() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+      + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  // Records gegen kaputte/manipulierte Daten absichern (z. B. Backup-Import).
+  const HEX_COLOR = /^#[0-9a-f]{3,8}$/i;
+  function sanitizeCategory(c) {
+    c.icon = String(c.icon || '').slice(0, 4);
+    if (!HEX_COLOR.test(String(c.color || ''))) c.color = '#64748b';
+    return c;
+  }
+
+  // Idempotent: legt beim ersten Start Konten/Kategorien/Settings aus CONFIG an
+  // und migriert Daten älterer Versionen (v1: ohne Konten/Kategorie-Hierarchie).
+  // Wird beim App-Start UND nach jedem Backup-Import aufgerufen.
   async function ensureSeed(config) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localToday();
 
     // Konten zuerst (Settings referenzieren das Default-Konto per ID).
     let accounts = await listAccounts();
@@ -129,21 +145,41 @@ const DB = (() => {
 
     let settings = await getSettings();
     if (!settings) {
-      await setSettings({
+      settings = {
         startDate: today,
         currency: config.app.currency,
         locale: config.app.locale,
         mode: (config.balance && config.balance.mode) || 'once',
         defaultAccountId: defAcc ? defAcc.id : null,
-      });
-    } else if (!settings.defaultAccountId && defAcc) {
-      settings.defaultAccountId = defAcc.id;
-      await setSettings(settings);
+      };
     }
+    if (defAcc && (!settings.defaultAccountId || !accounts.some((a) => a.id === settings.defaultAccountId))) {
+      settings.defaultAccountId = defAcc.id;
+    }
+    // v1 -> v2: globaler Anfangsbestand wandert auf das Default-Konto.
+    if (typeof settings.startBalanceCents === 'number' && defAcc) {
+      defAcc.startBalanceCents = (defAcc.startBalanceCents || 0) + settings.startBalanceCents;
+      await putAccount(defAcc);
+      delete settings.startBalanceCents;
+    }
+    await setSettings(settings);
 
     const cats = await listCategories();
     if (cats.length === 0) {
       for (const rec of buildCategoryRecords(config)) await putCategory(rec);
+    } else if (!cats.some((c) => c.group)) {
+      // v1 -> v2: neue Spalten-Struktur anlegen; alte flache Ausgaben-Kategorien
+      // archivieren (Entscheidung: "ersetzen") — Historie bleibt damit lesbar.
+      for (const rec of buildCategoryRecords(config)) {
+        if (rec.type === 'income' && cats.some((c) => c.type === 'income' && c.name === rec.name)) continue;
+        await putCategory(rec);
+      }
+      for (const c of cats) {
+        if (c.type !== 'income' && !c.archived) {
+          c.archived = true;
+          await putCategory(sanitizeCategory(c));
+        }
+      }
     }
   }
 
@@ -165,7 +201,9 @@ const DB = (() => {
   }
 
   // Ersetzt ALLE Daten durch die aus dem Backup (vorher leeren).
-  async function importAll(data) {
+  // Danach ensureSeed(config): migriert alte v1-Backups (ohne accounts/Hierarchie)
+  // und stellt sicher, dass Konten + defaultAccountId existieren.
+  async function importAll(data, config) {
     if (!data || !Array.isArray(data.transactions) || !Array.isArray(data.categories))
       throw new Error('Ungültiges Backup-Format');
     await clearStore('accounts');
@@ -175,10 +213,11 @@ const DB = (() => {
     await clearStore('recurring');
     if (data.settings) await setSettings(data.settings);
     for (const a of (data.accounts || [])) await putAccount(a);
-    for (const c of data.categories) await putCategory(c);
+    for (const c of data.categories) await putCategory(sanitizeCategory(c));
     for (const t of data.transactions) await putTransaction(t);
     for (const t of (data.transfers || [])) await putTransfer(t);
     for (const r of (data.recurring || [])) await putRecurring(r);
+    if (config) await ensureSeed(config);
   }
 
   return {

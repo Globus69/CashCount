@@ -10,7 +10,13 @@
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-  const todayISO = () => new Date().toISOString().slice(0, 10);
+  // Datum IMMER lokal formatieren — toISOString() ist UTC und kippt in UTC+x
+  // um Mitternacht auf den Vortag (nextDay würde dann nie weiterzählen).
+  function fmtISO(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+      + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  const todayISO = () => fmtISO(new Date());
 
   const INTERVAL_LABELS = { daily: 'täglich', weekly: 'wöchentlich', monthly: 'monatlich' };
   // getDay(): 0=So … 6=Sa. Anzeige Mo–So.
@@ -35,9 +41,9 @@
 
   // ---------- Datums-Helfer ----------
   function nextDay(iso) {
-    const d = new Date(iso + 'T00:00:00');
+    const d = new Date(iso + 'T12:00:00'); // Mittag: robust gegen DST-Umstellung
     d.setDate(d.getDate() + 1);
-    return d.toISOString().slice(0, 10);
+    return fmtISO(d);
   }
   function isDue(rule, iso) {
     const d = new Date(iso + 'T00:00:00');
@@ -68,9 +74,10 @@
     setTimeout(() => { t.hidden = true; }, 1500);
   }
   function dateLabel(iso) {
-    if (iso === todayISO()) return 'Heute';
-    if (iso === nextDay(new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10))) return 'Gestern';
-    return new Date(iso + 'T00:00:00').toLocaleDateString('de-DE',
+    const today = todayISO();
+    if (iso === today) return 'Heute';
+    if (nextDay(iso) === today) return 'Gestern';
+    return new Date(iso + 'T12:00:00').toLocaleDateString('de-DE',
       { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
   }
 
@@ -113,24 +120,25 @@
     state.categories.filter((c) => !c.archived && (c.type === type || c.type === 'both'))
       .sort((a, b) => (a.order || 0) - (b.order || 0));
 
-  // Ausgaben-Spalten in Reihenfolge.
+  // Ausgaben-Spalten in Reihenfolge ("beides"-Kategorien zählen mit).
+  const isExpenseLike = (c) => c.type === 'expense' || c.type === 'both';
   function expenseGroups() {
     const seen = [];
     state.categories
-      .filter((c) => !c.archived && c.type === 'expense' && !c.parentId && c.group)
+      .filter((c) => !c.archived && isExpenseLike(c) && !c.parentId && c.group)
       .sort((a, b) => (a.order || 0) - (b.order || 0))
       .forEach((c) => { if (!seen.includes(c.group)) seen.push(c.group); });
     return seen;
   }
   const level1 = (group) =>
-    state.categories.filter((c) => !c.archived && c.type === 'expense' && !c.parentId && c.group === group)
+    state.categories.filter((c) => !c.archived && isExpenseLike(c) && !c.parentId && c.group === group)
       .sort((a, b) => (a.order || 0) - (b.order || 0));
 
   function isValidLeaf(id, type) {
     const c = categoryById(id);
     if (!c || c.archived) return false;
     if (type === 'income') return c.type === 'income' || c.type === 'both';
-    return c.type === 'expense' && isLeaf(c);
+    return isExpenseLike(c) && isLeaf(c);
   }
   function defaultCategoryId(type) {
     if (type === 'income') {
@@ -702,7 +710,7 @@
     const psel = $('#catParent');
     psel.innerHTML = '<option value="">— (Ebene 1)</option>';
     state.categories
-      .filter((c) => c.type === 'expense' && !c.parentId && (!current || c.id !== current.id))
+      .filter((c) => isExpenseLike(c) && !c.parentId && (!current || c.id !== current.id))
       .sort((a, b) => (a.order || 0) - (b.order || 0))
       .forEach((c) => {
         const o = document.createElement('option');
@@ -711,15 +719,17 @@
       });
   }
   function updateCatRowsVisibility() {
-    const isExpense = $('#catType').value === 'expense';
+    const isExpense = $('#catType').value !== 'income';
     const hasParent = isExpense && $('#catParent').value;
-    $('#catParentRow').hidden = !isExpense;
-    // Spalte nur relevant für Ebene-1-Ausgaben; bei gewähltem Elternknoten wird Spalte vererbt.
+    // Kategorien mit eigenen Kindern dürfen keinen Parent bekommen (max. 2 Ebenen).
+    $('#catParentRow').hidden = !isExpense || state.cat.hasChildren;
+    // Spalte nur relevant für Ebene-1; bei gewähltem Elternknoten wird Spalte vererbt.
     $('#catGroupRow').hidden = !isExpense || !!hasParent;
   }
   function openCatEdit(cat) {
     const isNew = !cat;
     state.cat.id = isNew ? null : cat.id;
+    state.cat.hasChildren = !isNew && childrenOf(cat.id).length > 0;
     state.cat.color = isNew ? (CONFIG.ui.colorPalette || ['#64748b'])[0] : cat.color;
     $('#catSheetTitle').textContent = isNew ? 'Neue Kategorie' : 'Kategorie bearbeiten';
     $('#catIcon').value = isNew ? '' : (cat.icon || '');
@@ -742,8 +752,9 @@
     const type = $('#catType').value;
     const existing = state.cat.id ? state.categories.find((c) => c.id === state.cat.id) : null;
     let parentId = null, group = null;
-    if (type === 'expense') {
-      parentId = $('#catParent').value || null;
+    if (type !== 'income') {
+      // Kategorien mit Kindern bleiben Ebene 1 (max. 2 Ebenen).
+      parentId = state.cat.hasChildren ? null : ($('#catParent').value || null);
       const parent = parentId ? categoryById(parentId) : null;
       group = parent ? parent.group : ($('#catGroup').value || null);
     }
@@ -755,6 +766,13 @@
       archived: $('#catArchived').checked,
     };
     await DB.putCategory(cat);
+    // Parent archiviert -> Kinder mit-archivieren (sonst unsichtbar, aber "gültig").
+    if (cat.archived) {
+      for (const k of state.categories.filter((c) => c.parentId === cat.id && !c.archived)) {
+        k.archived = true;
+        await DB.putCategory(k);
+      }
+    }
     state.categories = await DB.listCategories();
     closeCat(); renderCapture(); renderHistory(); renderMore(); populateFilterCats();
     toast('Kategorie gespeichert ✓');
@@ -839,7 +857,11 @@
       note: $('#recurNote').value.trim(), interval: iv, anchorDay: anchor,
       startDate: $('#recurStart').value || todayISO(),
       endDate: $('#recurEnd').value || null,
-      lastRun: existing ? existing.lastRun : null,
+      // Reaktivierung beginnt ab heute — der inaktive Zeitraum wird nicht
+      // rückwirkend aufgefüllt. Neue Regeln erzeugen ab Startdatum (lastRun null).
+      lastRun: existing
+        ? (!existing.active && $('#recurActive').checked ? todayISO() : existing.lastRun)
+        : null,
       active: $('#recurActive').checked,
     };
     await DB.putRecurring(rule);
@@ -865,7 +887,7 @@
   // ---------- Daten: Export / Import ----------
   async function exportCsv() {
     if (state.transactions.length === 0) { toast('Keine Daten zum Exportieren'); return; }
-    const res = await Exporter.exportCSV(state.transactions, state.categories, state.accounts);
+    const res = await Exporter.exportCSV(state.transactions, state.categories, state.accounts, defaultAccountId());
     if (res !== 'cancelled') toast('CSV bereit ✓');
   }
   async function exportBackup() {
@@ -879,7 +901,7 @@
       const data = await Exporter.readBackupFile(file);
       const n = Array.isArray(data.transactions) ? data.transactions.length : 0;
       if (!window.confirm(`Backup laden? Alle aktuellen Daten werden ersetzt (${n} Einträge im Backup).`)) return;
-      await DB.importAll(data);
+      await DB.importAll(data, CONFIG);
       state.settings = await DB.getSettings();
       state.accounts = await DB.listAccounts();
       state.categories = await DB.listCategories();

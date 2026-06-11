@@ -14,11 +14,13 @@
 ## 2. Funktionsumfang (Scope)
 
 ### Muss (MVP)
-- **Anfangsbestand** eingeben/ändern.
-- **Eintrag erfassen:** Betrag, Typ (Ausgabe/Einnahme), Kategorie, Datum (Default heute), optionale Notiz.
-- **Kategorien** zuweisen (vordefinierte Liste + eigene anlegbar).
-- **Aktueller Bestand** wird automatisch berechnet und prominent angezeigt:
-  `Bestand = Anfangsbestand + Σ Einnahmen − Σ Ausgaben`
+- **Konten** (z. B. Bar, Sparda, Revolut, Mercedes) mit je eigenem **Anfangsbestand**; jede Buchung wirkt auf genau ein Konto.
+- **Eintrag erfassen:** Betrag (inkl. additiver Schnell-Eingabe-Buttons), Typ (Ausgabe/Einnahme), Kategorie (hierarchisch), Konto, Datum (Default heute), optionale Notiz.
+- **Kategorien** zuweisen (vordefinierte Hierarchie in Spalten + eigene anlegbar).
+- **Aktueller Bestand** wird automatisch berechnet und prominent angezeigt — pro Konto durchlaufend (kein monatliches Zurücksetzen):
+  `Bestand(Konto) = Anfangsbestand(Konto) + Σ Einnahmen − Σ Ausgaben ± Transfers (jeweils dieses Konto)`
+  `Bestand gesamt = Σ Bestand aller Konten`
+- **Transfers** zwischen Konten (Umbuchung/Einzahlung/Abhebung) — verändern nur Kontostände, zählen **nicht** als Einnahme/Ausgabe.
 - **Liste** der Einträge (chronologisch, nach Tag gruppiert).
 - **Eintrag bearbeiten / löschen.**
 
@@ -39,24 +41,43 @@ Object Stores:
 ### `settings` (Einzelobjekt, key = "app")
 ```
 {
-  startBalance: number,   // Anfangsbestand in Cent
-  startDate: string,      // ISO-Datum, ab wann gerechnet wird
+  startDate: string,        // ISO-Datum, ab wann gerechnet wird
   currency: "EUR",
-  locale: "de-DE"
+  locale: "de-DE",
+  mode: "once",             // Bestand läuft durch (kein monatliches Zurücksetzen)
+  defaultAccountId: string  // beim Erfassen vorausgewähltes Konto
+}
+```
+> v1 hatte hier `startBalanceCents` (globaler Anfangsbestand). Wird bei der
+> Migration auf das Default-Konto übertragen — Anfangsbestände leben jetzt in `accounts`.
+
+### `accounts` (seit DB v2)
+```
+{
+  id: string,                // uuid
+  name: string,              // z.B. "Bar", "Sparda", "Revolut", "Mercedes"
+  startBalanceCents: number, // Anfangsbestand DIESES Kontos, in Cent
+  order: number,             // Anzeigereihenfolge
+  archived: boolean
 }
 ```
 
-### `categories`
+### `categories` (seit v2 hierarchisch, max. 2 Ebenen)
 ```
 {
   id: string,             // uuid
   name: string,           // z.B. "Lebensmittel"
-  icon: string,           // Emoji oder Icon-Key
+  icon: string,           // Emoji
   color: string,          // Hex
   type: "expense" | "income" | "both",
+  group: string | null,   // Spalten-Überschrift im Picker (z.B. "Einkauf", "Boot"); nur Ausgaben
+  parentId: string | null,// gesetzt = Ebene-2-Kategorie unter diesem Elternknoten
+  order: number,          // Anzeigereihenfolge
   archived: boolean
 }
 ```
+> Gebucht wird nur auf **Blatt**-Kategorien (Ebene 1 ohne Kinder, oder Ebene 2).
+> Eltern mit Kindern klappen im Picker nur die zweite Ebene auf.
 
 ### `transactions`
 ```
@@ -65,12 +86,28 @@ Object Stores:
   date: string,           // ISO-Datum
   amountCents: number,    // immer positiv, in Cent
   type: "expense" | "income",
-  categoryId: string,
+  categoryId: string,     // Blatt-Kategorie (Ebene 1 oder 2)
+  accountId: string,      // Konto, auf das die Buchung wirkt (fehlt bei Alt-Daten -> Default-Konto)
   note: string,
   recurringId: string | null,  // Herkunft, falls aus Regel erzeugt
   createdAt: string
 }
 ```
+
+### `transfers` (seit DB v2 — Umbuchungen zwischen Konten)
+```
+{
+  id: string,             // uuid
+  date: string,           // ISO-Datum
+  amountCents: number,    // immer positiv, in Cent
+  fromAccountId: string,
+  toAccountId: string,
+  note: string,
+  createdAt: string
+}
+```
+> Transfers (auch Bargeld-Einzahlung/Abhebung) sind **keine** Einnahmen/Ausgaben:
+> Sie verschieben nur Geld zwischen Konten und tauchen in der Monatsübersicht nicht auf.
 
 ### `recurring` (Regeln für wiederkehrende Einträge)
 ```
@@ -79,6 +116,7 @@ Object Stores:
   amountCents: number,
   type: "expense" | "income",
   categoryId: string,
+  accountId: string,      // Konto, auf das erzeugte Buchungen wirken
   note: string,
   interval: "daily" | "weekly" | "monthly",
   anchorDay: number,      // z.B. Tag im Monat (1–31) bzw. Wochentag (0–6)
@@ -93,18 +131,25 @@ Object Stores:
 
 ## 4. Bedienoberfläche (grob)
 
-Bottom-Navigation mit 3 Bereichen — optimiert für Daumenbedienung:
+Bottom-Navigation mit 4 Bereichen — optimiert für Daumenbedienung:
 
 1. **Erfassen** (Startansicht)
-   - Großer Bestand oben.
-   - Ziffernblock + Betragsfeld, Umschalter Ausgabe/Einnahme.
-   - Kategorie-Chips (häufigste zuerst).
-   - Großer „Speichern"-Button.
+   - Großer Gesamtbestand oben.
+   - Betragsfeld mit Clear-Button + vier additive Schnell-Eingabe-Buttons (2,50/5/7,50/10 €).
+   - Umschalter Ausgabe/Einnahme.
+   - Kategorie-Picker: 3 Spalten (Einkauf/Boot/Sonstiges), Ebene 1 immer sichtbar,
+     Tap auf Eltern-Kategorie klappt Ebene 2 auf; Einnahmen als flache Chips.
+   - Konto-Auswahl (Default „Bar").
+   - Großer „Speichern"-Button, darunter klein die Summe aller Konten + Einzelbeträge.
 2. **Verlauf**
-   - Einträge nach Tag gruppiert, mit Tagessumme.
+   - Einträge nach Tag gruppiert, mit Tagessumme; Filter & Suche.
    - Tippen → bearbeiten/löschen.
-3. **Mehr / Einstellungen**
-   - Anfangsbestand, Kategorien verwalten, wiederkehrende Einträge, (später) Export.
+3. **Konten**
+   - Konten-Übersicht (Einzelbestände + Gesamt).
+   - Transfer / Ein- & Auszahlung (Konto A → B), Liste letzter Umbuchungen.
+   - Anfangsbestand je Konto.
+4. **Mehr / Einstellungen**
+   - Monatsübersicht, Kategorien verwalten, wiederkehrende Einträge, CSV-Export & Backup.
 
 Designprinzip: **so wenige Taps wie möglich** für einen Standard-Eintrag (Betrag → Kategorie → Speichern).
 

@@ -39,14 +39,11 @@ Lebendiges Dokument für Roadmap, Entscheidungen und offene Punkte. Neueste Eint
 - [x] Filter & Suche im Verlauf (Text, Typ, Kategorie)
 - [x] App-Icons (180/192/512 + maskable) generiert — Euro-Münze im Theme-Look
 
-## Offene Punkte / zu klären
-Antwort:
-- App-Icon: ist ok aber in Rot / Orange
-- Standard-Kategorien: 
- Lebensmittel, Restaurant, Transport, Boot, Wohnen, Freizeit, Sonstiges
-- Anfangsbestand pro Zeitraum monatlich neu
-- Wiederkehrend: 
- Intervalle  (täglich/wöchentlich/monatlich)
+## Offene Punkte / zu klären (beantwortet, in Iteration 4 verarbeitet)
+- App-Icon: ok, aber in Rot/Orange → **noch offen** (siehe „Offen / später")
+- Standard-Kategorien → ersetzt durch Kategorie-Hierarchie aus Iteration 4 (s. u.)
+- Anfangsbestand „monatlich neu" → **revidiert**: mit echten Konten durchlaufend (s. Iteration 4)
+- Wiederkehrend: Intervalle täglich/wöchentlich/monatlich ✅ (seit Iteration 2)
 
 
 
@@ -96,7 +93,31 @@ Vorgabe ist "Bar"
 
 05 Auf der Eingabeseite muss auch klein angezeigt werden die Summe aller Konten Und Die Beträge der Einzel Konten
 
-## Iteration 4 — Konten, Schnell-Eingabe & Kategorie-Hierarchie (geklärt 2026-06-11)
+## Iteration 4 — Konten, Schnell-Eingabe & Kategorie-Hierarchie (umgesetzt 2026-06-11)
+
+- [x] 01 Schnell-Eingabe-Buttons (2,50/5/7,50/10 €, additiv) + Clear-Button am Betragsfeld
+- [x] 02 Kategorie-Hierarchie: 3 Spalten (Einkauf/Boot/Sonstiges), Ebene 2 ausklappbar
+- [x] 03 Konto-Auswahl beim Erfassen (Bar/Sparda/Revolut/Mercedes, Vorgabe Bar)
+- [x] 04 Konten-Tab: Transfer/Einzahlung/Abhebung (reine Umbuchung, nicht in Monatsstatistik)
+- [x] 05 Kleine Konten-Summe (gesamt + je Konto) auf der Eingabeseite
+- [x] DB v2 (Stores accounts/transfers), CSV mit Konto-Spalte, Service-Worker v6/v7
+
+### Review-Fixes (2026-06-11, nach Agenten-Review)
+- [x] **Migration v1→v2**: alte Kategorien ohne `group` machten den Ausgaben-Picker leer
+      (Kategorie-Auswahl unsichtbar auf Bestandsgeräten!) → neue Struktur wird nachgeseedet,
+      alte flache Ausgaben-Kategorien archiviert; alter globaler Anfangsbestand
+      (`settings.startBalanceCents`) wandert aufs Default-Konto
+- [x] **Backup-Import alter v1-Backups**: leerte den Konten-Store → `importAll` ruft jetzt
+      `ensureSeed` (Migration) auf; Icon/Farbe werden beim Import validiert
+- [x] **Datums-Bug (kritisch)**: `nextDay()` via `toISOString()` (UTC) lieferte in UTC+x
+      denselben Tag zurück → Endlosschleife in `generateDueRecurring` sobald eine Regel
+      aktiv ist; jetzt lokale Datumsformatierung überall
+- [x] Toast global statt nur in „Erfassen" sichtbar (z. B. „Umgebucht ✓", Import-Fehler)
+- [x] „beides"-Kategorien erscheinen jetzt auch im Ausgaben-Picker
+- [x] Max. 2 Kategorie-Ebenen erzwungen; Archivieren eines Parents archiviert Kinder mit
+- [x] Reaktivierte wiederkehrende Regel füllt inaktiven Zeitraum nicht mehr rückwirkend auf
+- [x] CSV: Alt-Buchungen ohne Konto werden dem Default-Konto zugeordnet (wie in der App)
+- [x] `Money.parse`: „1.234,56" (Tausenderpunkt) korrekt
 
 Verbindliche Antworten zu 01–05 (per Spokenly geklärt):
 

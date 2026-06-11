@@ -8,7 +8,7 @@ const Exporter = (() => {
   }
 
   // transactions -> CSV-String (deutsch: Semikolon, Komma-Dezimal, mit BOM für Excel)
-  function toCSV(transactions, categories, accounts) {
+  function toCSV(transactions, categories, accounts, defaultAccountId) {
     const catName = (id) => {
       const c = categories.find((x) => x.id === id);
       if (!c) return 'Unbekannt';
@@ -18,8 +18,9 @@ const Exporter = (() => {
       }
       return c.name;
     };
+    // Alt-Buchungen ohne accountId zählt die App zum Default-Konto — Export ebenso.
     const accName = (id) => {
-      const a = (accounts || []).find((x) => x.id === id);
+      const a = (accounts || []).find((x) => x.id === (id || defaultAccountId));
       return a ? a.name : '';
     };
     const head = ['Datum', 'Typ', 'Kategorie', 'Konto', 'Betrag', 'Notiz'];
@@ -56,8 +57,9 @@ const Exporter = (() => {
     return 'downloaded';
   }
 
-  async function exportCSV(transactions, categories, accounts) {
-    return deliver(`cashcount-${tsStamp()}.csv`, toCSV(transactions, categories, accounts), 'text/csv');
+  async function exportCSV(transactions, categories, accounts, defaultAccountId) {
+    return deliver(`cashcount-${tsStamp()}.csv`,
+      toCSV(transactions, categories, accounts, defaultAccountId), 'text/csv');
   }
 
   async function exportBackup(backupObj) {

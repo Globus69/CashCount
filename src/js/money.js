@@ -12,12 +12,14 @@ const Money = {
     return withSymbol ? `${str} €` : str;
   },
 
-  // Nutzereingabe ("12,34", "12.34", "12") -> Cent (Integer) oder null
+  // Nutzereingabe ("12,34", "12.34", "1.234,56", "12") -> Cent (Integer) oder null
   parse(input) {
     if (input == null) return null;
-    const cleaned = String(input).trim().replace(/\s|€/g, '').replace(',', '.');
-    if (cleaned === '' || isNaN(Number(cleaned))) return null;
-    return Math.round(Number(cleaned) * 100);
+    let s = String(input).trim().replace(/\s|€/g, '');
+    // Deutsches Format: wenn ein Komma vorkommt, sind Punkte Tausendertrenner.
+    if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+    if (s === '' || isNaN(Number(s))) return null;
+    return Math.round(Number(s) * 100);
   },
 };
 
