@@ -630,6 +630,7 @@
   function renderMore() {
     renderCategoryList();
     renderRecurringList();
+    renderSyncCard();
   }
 
   // ---------- Konten-Ansicht ----------
@@ -747,6 +748,7 @@
     };
     await DB.putTransaction(t);
     state.transactions.push(t);
+    Sync.markDirty();
     $('#amountInput').value = ''; $('#noteInput').value = '';
     refreshBalances(); renderHistory();
     toast('Gespeichert ✓');
@@ -759,6 +761,7 @@
     if (!acc) return;
     acc.startBalanceCents = cents;
     await DB.putAccount(acc);
+    Sync.markDirty();
     refreshBalances();
     toast('Anfangsbestand gesichert ✓');
   }
@@ -778,6 +781,7 @@
     };
     await DB.putTransfer(tr);
     state.transfers.push(tr);
+    Sync.markDirty();
     $('#transferAmount').value = ''; $('#transferNote').value = '';
     refreshBalances(); renderTransferList();
     toast('Umgebucht ✓');
@@ -785,6 +789,7 @@
   async function deleteTransfer(id) {
     await DB.deleteTransfer(id);
     state.transfers = state.transfers.filter((x) => x.id !== id);
+    Sync.markDirty();
     refreshBalances(); renderTransferList();
     toast('Umbuchung gelöscht');
   }
@@ -819,6 +824,7 @@
     t.accountId = $('#editAccount').value || state.edit.accountId;
     t.date = $('#editDate').value || t.date; t.note = $('#editNote').value.trim();
     await DB.putTransaction(t);
+    Sync.markDirty();
     closeEdit(); refreshBalances(); renderHistory();
     toast('Aktualisiert ✓');
   }
@@ -826,6 +832,7 @@
     const id = state.edit.id; if (!id) return;
     await DB.deleteTransaction(id);
     state.transactions = state.transactions.filter((x) => x.id !== id);
+    Sync.markDirty();
     closeEdit(); refreshBalances(); renderHistory();
     toast('Gelöscht');
   }
@@ -918,6 +925,7 @@
       }
     }
     state.categories = await DB.listCategories();
+    Sync.markDirty();
     closeCat(); renderCapture(); renderHistory(); renderMore(); populateFilterCats();
     toast('Kategorie gespeichert ✓');
   }
@@ -928,6 +936,7 @@
     for (const k of kids) await DB.deleteCategory(k.id);
     await DB.deleteCategory(id);
     state.categories = await DB.listCategories();
+    Sync.markDirty();
     closeCat(); renderCapture(); renderHistory(); renderMore(); populateFilterCats();
     toast('Kategorie gelöscht');
   }
@@ -1009,6 +1018,7 @@
       active: $('#recurActive').checked,
     };
     await DB.putRecurring(rule);
+    Sync.markDirty();
     closeRecur();
     await refreshAfterRecurringChange();
     toast('Regel gespeichert ✓');
@@ -1016,6 +1026,7 @@
   async function deleteRecur() {
     const id = state.recur.id; if (!id) return;
     await DB.deleteRecurring(id);
+    Sync.markDirty();
     closeRecur();
     state.recurring = await DB.listRecurring();
     renderMore();
@@ -1039,6 +1050,19 @@
     const res = await Exporter.exportBackup(data);
     if (res !== 'cancelled') toast('Backup bereit ✓');
   }
+  // Kompletten State aus der DB neu laden und alle Ansichten rendern
+  // (nach Backup-Import oder Sync-Pull).
+  async function loadStateAndRender() {
+    state.settings = await DB.getSettings();
+    state.accounts = await DB.listAccounts();
+    state.categories = await DB.listCategories();
+    state.transactions = await DB.listTransactions();
+    state.transfers = await DB.listTransfers();
+    state.recurring = await DB.listRecurring();
+    populateFilterCats();
+    refreshBalances(); renderCapture(); renderHistory(); renderAccounts(); renderMore();
+  }
+
   async function importBackup(file) {
     if (!file) return;
     try {
@@ -1046,18 +1070,44 @@
       const n = Array.isArray(data.transactions) ? data.transactions.length : 0;
       if (!window.confirm(`Backup laden? Alle aktuellen Daten werden ersetzt (${n} Einträge im Backup).`)) return;
       await DB.importAll(data, CONFIG);
-      state.settings = await DB.getSettings();
-      state.accounts = await DB.listAccounts();
-      state.categories = await DB.listCategories();
-      state.transactions = await DB.listTransactions();
-      state.transfers = await DB.listTransfers();
-      state.recurring = await DB.listRecurring();
-      populateFilterCats();
-      refreshBalances(); renderCapture(); renderHistory(); renderAccounts(); renderMore();
+      await loadStateAndRender();
+      Sync.markDirty();
       toast('Backup geladen ✓');
     } catch (e) {
       console.error(e); toast('Import fehlgeschlagen: ' + e.message);
     }
+  }
+
+  // ---------- Sync (GitHub) ----------
+  function updateSyncUI(msg, kind) {
+    const st = $('#syncStatus');
+    if (st && msg) st.textContent = msg;
+    const btn = $('#syncBtn');
+    if (btn) {
+      btn.hidden = !Sync.isConfigured();
+      btn.classList.toggle('is-busy', kind === 'busy');
+      btn.classList.toggle('is-error', kind === 'error');
+    }
+  }
+  function renderSyncCard() {
+    $('#syncRepo').value = Sync.getRepo();
+    $('#syncToken').value = Sync.getToken();
+    $('#syncEnabled').checked = Sync.isEnabled();
+    const last = Sync.lastSyncAt();
+    $('#syncStatus').textContent = last
+      ? 'Zuletzt synchronisiert: ' + new Date(last).toLocaleString('de-DE')
+      : (Sync.isConfigured() ? 'Noch nicht synchronisiert.' : 'Nicht eingerichtet.');
+  }
+  function saveSyncConfig() {
+    const repo = $('#syncRepo').value.trim();
+    const token = $('#syncToken').value.trim();
+    if ((repo || token) && !/^[\w.-]+\/[\w.-]+$/.test(repo)) {
+      toast('Repo bitte als benutzer/repository angeben'); return;
+    }
+    Sync.configure(repo, token, $('#syncEnabled').checked);
+    updateSyncUI('', 'info'); renderSyncCard();
+    toast('Sync-Einstellungen gesichert ✓');
+    if (Sync.isEnabled()) Sync.syncNow('setup');
   }
 
   // ---------- Navigation ----------
@@ -1128,6 +1178,11 @@
     $('#filterType').addEventListener('change', (e) => { state.filter.type = e.target.value; renderHistory(); });
     $('#filterCat').addEventListener('change', (e) => { state.filter.cat = e.target.value; renderHistory(); });
 
+    // Sync
+    $('#syncSaveBtn').addEventListener('click', saveSyncConfig);
+    $('#syncNowBtn').addEventListener('click', () => Sync.syncNow('manual'));
+    $('#syncBtn').addEventListener('click', () => Sync.syncNow('manual'));
+
     // Daten: Export / Import
     $('#exportCsvBtn').addEventListener('click', exportCsv);
     $('#backupBtn').addEventListener('click', exportBackup);
@@ -1142,13 +1197,24 @@
     applyTheme();
     await DB.open();
     await DB.ensureSeed(CONFIG);
+
+    // Sync ZUERST: Cloud-Stand holen, bevor fällige Regeln erzeugt werden —
+    // sonst erzeugen zwei Geräte dieselben wiederkehrenden Buchungen doppelt.
+    Sync.init(CONFIG, { afterPull: loadStateAndRender, onStatus: updateSyncUI });
+    if (Sync.isEnabled()) {
+      await Sync.syncNow('start');
+      Sync.startTimer();
+    }
+
     state.settings = await DB.getSettings();
     state.accounts = await DB.listAccounts();
     state.categories = await DB.listCategories();
     state.transfers = await DB.listTransfers();
-    await generateDueRecurring();
+    const created = await generateDueRecurring();
     state.transactions = await DB.listTransactions();
     state.recurring = await DB.listRecurring();
+    if (created > 0) Sync.markDirty();
+    updateSyncUI('', 'info');
 
     state.capture.accountId = defaultAccountId();
     state.stats.month = monthKey(todayISO());

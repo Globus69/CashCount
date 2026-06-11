@@ -19,7 +19,10 @@
       <span class="balance__label">Bestand gesamt</span>
       <span class="balance__sub" id="balanceSub"></span>
     </span>
-    <span class="balance__value" id="balanceValue">–</span>
+    <span class="balance__right">
+      <span class="balance__value" id="balanceValue">–</span>
+      <button type="button" class="syncbtn" id="syncBtn" hidden aria-label="Synchronisieren">↻</button>
+    </span>
   </header>
 
   <main id="views">
@@ -176,6 +179,23 @@
       </div>
 
       <div class="card">
+        <h2>Sync (GitHub)</h2>
+        <p class="muted">Gleicht die Daten über ein <strong>privates</strong> GitHub-Repository
+          zwischen deinen Geräten ab (beim Start, alle 5 Min, nach Änderungen + Refresh-Button
+          oben). Einrichtung: privates Repo anlegen, dann unter GitHub →
+          Settings → Developer settings → <em>Fine-grained tokens</em> ein Token nur für dieses
+          Repo mit Berechtigung „Contents: Read and write" erstellen.</p>
+        <input id="syncRepo" class="field" placeholder="benutzer/repository" autocapitalize="off" autocorrect="off">
+        <input id="syncToken" class="field" type="password" placeholder="GitHub-Token (github_pat_…)">
+        <label class="check"><input type="checkbox" id="syncEnabled"> Automatisch synchronisieren</label>
+        <div class="row">
+          <button type="button" class="btn" id="syncSaveBtn">Sichern</button>
+          <button type="button" class="btn" id="syncNowBtn">Jetzt synchronisieren</button>
+        </div>
+        <p class="muted" id="syncStatus"></p>
+      </div>
+
+      <div class="card">
         <h2>Daten</h2>
         <div class="datagrid">
           <button type="button" class="btn" id="exportCsvBtn">CSV exportieren</button>
@@ -300,6 +320,7 @@
   <script src="js/money.js"></script>
   <script src="js/db.js"></script>
   <script src="js/exporter.js"></script>
+  <script src="js/sync.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

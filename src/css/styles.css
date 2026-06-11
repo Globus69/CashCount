@@ -36,6 +36,15 @@ body { display: flex; flex-direction: column; min-height: 100dvh; }
 .balance__value { font-size: 26px; font-weight: 700; letter-spacing: -.5px; white-space: nowrap; }
 .balance__value.is-negative { color: var(--expense); }
 .balance__sub { font-size: 11px; color: rgba(255,255,255,.6); }
+.balance__right { display: flex; align-items: center; gap: 10px; }
+.syncbtn {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.12);
+  color: #fff; font-size: 17px; line-height: 1;
+}
+.syncbtn.is-busy { animation: syncspin 1s linear infinite; }
+.syncbtn.is-error { border-color: var(--expense); color: var(--expense); }
+@keyframes syncspin { to { transform: rotate(360deg); } }
 
 main {
   flex: 1; overflow-y: auto; padding: 16px;

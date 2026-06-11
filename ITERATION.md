@@ -202,10 +202,31 @@ Per Spokenly geklärt und umgesetzt:
       unterbunden (`overflow-x: hidden`, `touch-action: pan-y`, `overscroll-behavior`)
 - [x] Service-Worker v9
 
-## Eingegangen (zu klären)
-- **Geräte-Sync** (iPhone ↔ Laptop, automatisch im Zeitintervall und/oder Refresh-Button):
-  braucht eine Cloud-Komponente und widerspricht damit der bisherigen Grundsatzentscheidung
-  „kein Backend, Daten nur lokal" → Klärung mit dem User, welcher Weg gewünscht ist.
+## Iteration 7 — Geräte-Sync über GitHub (umgesetzt 2026-06-11)
+
+Per Spokenly geklärt: **Option A** — Sync über das bestehende GitHub-Konto
+(privates Repository als Speicher). Revidiert damit die Grundsatzentscheidung
+„keine Cloud" — es bleibt aber bei „kein eigener Server".
+
+- [x] Neues Modul `js/sync.js`: liest/schreibt `cashcount-data.json` in einem
+      **privaten** GitHub-Repo (Contents-API, SHA-basiertes optimistic locking)
+- [x] **Automatisch**: Pull beim App-Start (VOR `generateDueRecurring`, damit zwei
+      Geräte fällige Regeln nicht doppelt erzeugen), Intervall alle 5 Min,
+      debounced Push ~8 s nach jeder Änderung
+- [x] **Manuell**: Refresh-Button (↻) im Kopfbereich + „Jetzt synchronisieren" in „Mehr"
+- [x] Einrichtung in „Mehr → Sync (GitHub)": Repo (`benutzer/repository`) + Fine-grained-Token
+      (nur Contents Read/Write); beides liegt NUR im localStorage des Geräts,
+      wird nie mitsynchronisiert
+- [x] Konfliktfall (beide Seiten geändert): Nachfrage — Cloud-Stand übernehmen
+      oder lokalen Stand hochladen (Last-Write-Wins auf Gesamtbestand)
+- [x] Service-Worker v10 (sync.js in der App-Shell)
+
+Einrichtungs-Schritte (einmalig, auf jedem Gerät):
+1. Auf github.com ein **privates** Repo anlegen (z. B. `cashcount-daten`).
+2. GitHub → Settings → Developer settings → Fine-grained tokens → Token nur für
+   dieses Repo, Berechtigung „Contents: Read and write".
+3. In der App unter „Mehr → Sync": `benutzer/repo` + Token eintragen,
+   „Automatisch synchronisieren" anhaken, Sichern.
 
 Original-Anforderungen:
 - Auf dem Mobilgerät darf beim scrollen der Bildschirm nicht seitlich ausweichen und dann Teile des Bildschirms verdecken beziehungsweise freie Stellenanzeigen wenn andere Bereiche verdeckt sind. Sozusagen eines statischessscrollen nur Vertikal.

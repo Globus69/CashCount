@@ -34,6 +34,7 @@ CashCount/
     │   ├── app.js      # UI/Steuerung
     │   ├── db.js       # IndexedDB-Wrapper (inkl. Seeding/Migration)
     │   ├── exporter.js # CSV-Export & JSON-Backup (iOS-Teilen-Sheet)
+    │   ├── sync.js     # optionaler Geräte-Sync über privates GitHub-Repo
     │   └── money.js    # Geld-Formatierung/Parsing (Cent <-> Anzeige)
     └── icons/          # App-Icons (PWA)
 ```

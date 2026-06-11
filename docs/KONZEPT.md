@@ -7,7 +7,12 @@
 - **Zweck:** Tägliche Erfassung von Ausgaben (und Einnahmen) als einfaches Kassenbuch.
 - **Nutzung:** ca. 10 Einträge pro Tag, sehr schnelle Bedienung.
 - **Plattform:** iPhone, als **PWA** (Progressive Web App) — wird in Safari geöffnet und über „Zum Home-Bildschirm" als App-Icon abgelegt.
-- **Datenhaltung:** ausschließlich **lokal** auf dem iPhone (IndexedDB). Keine Cloud, kein Server, kein Account.
+- **Datenhaltung:** **lokal** auf dem Gerät (IndexedDB). Kein eigener Server.
+  Optional (seit Iteration 7): **Geräte-Sync** über ein privates GitHub-Repository
+  des Nutzers — die App liest/schreibt dort eine JSON-Datei mit dem Datenbestand
+  (beim Start, alle 5 Min, nach Änderungen, manuell per Refresh-Button).
+  Zugang (Repo + Fine-grained-Token) liegt nur lokal auf dem Gerät und wird nie
+  mitsynchronisiert. Konflikt (beide Geräte geändert) → Nachfrage, welcher Stand gilt.
 - **Kein** App Store, **kein** Entwickler-Account, **keine** Ablauffristen.
 - **Sprache/Währung:** Deutsch, Euro (€).
 
