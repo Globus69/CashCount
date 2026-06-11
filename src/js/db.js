@@ -134,18 +134,19 @@ const DB = (() => {
     const today = localToday();
 
     // Konten zuerst (Settings referenzieren das Default-Konto per ID).
+    // Fehlende werden EINZELN ergänzt (Abgleich über Name): robust gegen ein
+    // unterbrochenes Erst-Seeding und erlaubt spätere Ergänzungen in config.js.
     let accounts = await listAccounts();
-    if (accounts.length === 0) {
-      let i = 0;
-      for (const a of (config.accounts && config.accounts.list) || []) {
-        await putAccount({
-          id: uuid(), name: a.name,
-          startBalanceCents: Math.round((a.startEuro || 0) * 100),
-          order: i++, archived: false,
-        });
-      }
-      accounts = await listAccounts();
+    let ao = accounts.reduce((m, a) => Math.max(m, a.order || 0), 0);
+    for (const a of (config.accounts && config.accounts.list) || []) {
+      if (accounts.some((x) => x.name === a.name)) continue;
+      await putAccount({
+        id: uuid(), name: a.name,
+        startBalanceCents: Math.round((a.startEuro || 0) * 100),
+        order: (ao += 10), archived: false,
+      });
     }
+    accounts = await listAccounts();
     const defName = config.accounts && config.accounts.default;
     const defAcc = accounts.find((a) => a.name === defName) || accounts[0];
 

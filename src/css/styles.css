@@ -221,11 +221,19 @@ input[type="date"].field { color-scheme: dark; }
   background: var(--accent); color: #fff; font-size: 18px; font-weight: 700;
 }
 .save--inline { flex: 1; }
-/* Speichern bleibt beim Scrollen im Sichtfeld (über der Tabbar) */
-.save--sticky {
-  position: sticky; bottom: 8px; z-index: 5;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, .5);
+/* Speichern bleibt beim Scrollen im Sichtfeld (über der Tabbar) —
+   als opake Leiste in voller Breite: dahinter scheint nichts durch. */
+.savebar {
+  position: sticky; bottom: 0; z-index: 5;
+  margin: 0 -16px; padding: 10px 16px;
+  background: var(--bg);
 }
+.savebar::before { /* weicher Übergang oberhalb der Leiste */
+  content: ''; position: absolute; left: 0; right: 0; top: -14px; height: 14px;
+  background: linear-gradient(180deg, transparent, var(--bg));
+  pointer-events: none;
+}
+.savebar .save { width: 100%; box-shadow: 0 6px 18px rgba(0, 0, 0, .5); }
 
 .toast {
   position: fixed; left: 16px; right: 16px;

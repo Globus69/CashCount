@@ -168,11 +168,16 @@
     }
     return null;
   }
-  // validiert ctx.categoryId für den Typ und klappt ggf. den Elternknoten auf.
+  // Validiert ctx.categoryId für den Typ. Auf-/Zuklappen steuert NUR der User
+  // (Toggle) — nur wenn die Auswahl neu vergeben wird, klappen wir den Parent
+  // der Default-Auswahl auf. Sonst würde das Erzwingen hier verhindern, dass
+  // man andere Kategorien öffnet oder per erneutem Tipp wieder schließt.
   function syncCategory(ctx, type) {
-    if (!isValidLeaf(ctx.categoryId, type)) ctx.categoryId = defaultCategoryId(type);
-    const c = categoryById(ctx.categoryId);
-    ctx.expandedParentId = c && c.parentId ? c.parentId : ctx.expandedParentId;
+    if (!isValidLeaf(ctx.categoryId, type)) {
+      ctx.categoryId = defaultCategoryId(type);
+      const c = categoryById(ctx.categoryId);
+      ctx.expandedParentId = c && c.parentId ? c.parentId : null;
+    }
   }
 
   // ---------- Wiederkehrende Einträge erzeugen ----------

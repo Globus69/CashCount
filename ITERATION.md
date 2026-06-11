@@ -14,8 +14,8 @@ Die Detail-Historie aller Iterationen steht in den Git-Commits.
 
 ## Status
 
-Stand **2026-06-11**: Iterationen 0–8 vollständig umgesetzt und live unter
-https://globus69.github.io/CashCount/ (Service-Worker v11). Geräte-Sync über das
+Stand **2026-06-11**: Iterationen 0–9 vollständig umgesetzt und live unter
+https://globus69.github.io/CashCount/ (Service-Worker v12). Geräte-Sync über das
 private Repo `Globus69/cashcount-daten` ist eingerichtet und läuft.
 
 ## Getroffene Entscheidungen (gültig)
@@ -72,3 +72,16 @@ Unterkategorien grafisch bearbeiten — umbenennen, Icon/Farbe ändern, Reihenfo
 per Drag & Drop oder Pfeilen, Ebene wechseln (Ebene 1 ↔ 2), Spalte/Elternknoten
 verschieben, neu anlegen, archivieren, löschen · **Datenbank-Reset**-Button mit
 doppeltem Warnhinweis · schreibt direkt in die Datenbank und stößt den Geräte-Sync an.
+
+### Iteration 9 (2026-06-11) — Picker-Bugfixes & Savebar
+**Kategorie-Wechsel-Bug** behoben: `syncCategory` erzwang den aufgeklappten
+Elternknoten bei jedem Render — bei offener Kategorie ließ sich keine andere
+öffnen und erneutes Tippen klappte nicht ein; Auf-/Zuklappen steuert jetzt
+allein der User · **Einklappen per erneutem Tipp** funktioniert (auch mit
+gewählter Unterkategorie; Auswahl bleibt markiert) · **Speichern-Button** als
+opake Sticky-Leiste in voller Breite mit weichem Übergang — dahinter scheint
+beim Scrollen nichts mehr durch · Härtung: fehlende Konten werden beim Start
+einzeln ergänzt (robust gegen unterbrochenes Erst-Seeding; erlaubt neue Konten
+via config.js) · Service-Worker v12.
+
+
