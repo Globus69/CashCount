@@ -37,6 +37,7 @@
     cat: { id: null, color: null },
     recur: { id: null, type: 'expense', categoryId: null, expandedParentId: null, accountId: null },
     filter: { q: '', type: 'all', cat: 'all' },
+    stats: { month: null }, // 'YYYY-MM', wird in init() gesetzt
   };
 
   // ---------- Datums-Helfer ----------
@@ -44,6 +45,20 @@
     const d = new Date(iso + 'T12:00:00'); // Mittag: robust gegen DST-Umstellung
     d.setDate(d.getDate() + 1);
     return fmtISO(d);
+  }
+  const monthKey = (iso) => (iso || '').slice(0, 7);
+  function addMonths(ym, n) {
+    const [y, m] = ym.split('-').map(Number);
+    const d = new Date(y, m - 1 + n, 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  function monthLabel(ym, opts) {
+    return new Date(ym + '-01T12:00:00').toLocaleDateString('de-DE',
+      opts || { month: 'long', year: 'numeric' });
+  }
+  function lastDayOfMonth(ym) {
+    const [y, m] = ym.split('-').map(Number);
+    return ym + '-' + String(new Date(y, m, 0).getDate()).padStart(2, '0');
   }
   function isDue(rule, iso) {
     const d = new Date(iso + 'T00:00:00');
@@ -280,6 +295,7 @@
         + `<span class="${bal < 0 ? 'neg' : ''}">${Money.format(bal)}</span>`;
       wrap.appendChild(row);
     });
+    renderForecast(); // hängt am Gesamtbestand
   }
 
   function renderCaptureAccounts() {
@@ -400,30 +416,116 @@
     });
   }
 
-  // ---------- Monatsübersicht (nur Buchungen, keine Transfers) ----------
-  function renderStats() {
-    const m = todayISO().slice(0, 7);
-    $('#statMonth').textContent = new Date(m + '-01T00:00:00')
-      .toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
-    const txs = state.transactions.filter((t) => (t.date || '').slice(0, 7) === m);
-    let inc = 0, exp = 0;
-    const byCat = {};
-    txs.forEach((t) => {
-      if (t.type === 'income') inc += t.amountCents;
-      else { exp += t.amountCents; byCat[t.categoryId] = (byCat[t.categoryId] || 0) + t.amountCents; }
-    });
-    $('#statIncome').textContent = '+' + Money.format(inc);
-    $('#statExpense').textContent = '−' + Money.format(exp);
-    const net = inc - exp;
-    const netEl = $('#statNet');
-    netEl.textContent = Money.format(net);
-    netEl.className = net < 0 ? 'neg' : 'pos';
+  // ---------- Statistik-Seite (nur Buchungen, keine Transfers) ----------
+  function renderStatistics() {
+    const ym = state.stats.month || monthKey(todayISO());
+    $('#statsMonthLabel').textContent = monthLabel(ym);
+    $('#statsNext').disabled = ym >= monthKey(todayISO());
 
-    const wrap = $('#statByCat');
-    wrap.innerHTML = '';
-    const entries = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
-    if (entries.length === 0) { wrap.innerHTML = '<p class="muted">Keine Ausgaben diesen Monat.</p>'; return; }
+    const txs = state.transactions.filter((t) => monthKey(t.date) === ym);
+    let inc = 0, exp = 0;
+    const byLeaf = {}, byTop = {}, byDay = {};
+    txs.forEach((t) => {
+      if (t.type === 'income') { inc += t.amountCents; return; }
+      exp += t.amountCents;
+      byLeaf[t.categoryId] = (byLeaf[t.categoryId] || 0) + t.amountCents;
+      const cat = categoryById(t.categoryId);
+      const topId = cat && cat.parentId ? cat.parentId : (cat ? cat.id : 'unknown');
+      byTop[topId] = (byTop[topId] || 0) + t.amountCents;
+      const day = parseInt((t.date || '').slice(8, 10), 10) || 0;
+      byDay[day] = (byDay[day] || 0) + t.amountCents;
+    });
+
+    $('#statsIncome').textContent = '+' + Money.format(inc);
+    $('#statsExpense').textContent = '−' + Money.format(exp);
+    const net = inc - exp;
+    const netEl = $('#statsNet');
+    netEl.textContent = (net >= 0 ? '+' : '−') + Money.format(Math.abs(net));
+    netEl.classList.toggle('neg', net < 0);
+    netEl.classList.toggle('pos', net >= 0);
+
+    renderDonut(byTop, exp);
+    renderDailyBars(byDay, ym);
+    renderTrend(ym);
+    renderTopCats(byLeaf, exp);
+  }
+
+  // Donut: Ausgaben nach Bereich (Ebene-2 wird dem Elternknoten zugerechnet).
+  function renderDonut(byTop, totalExp) {
+    const wrap = $('#statsDonut');
+    if (!totalExp) { wrap.innerHTML = '<p class="muted">Keine Ausgaben in diesem Monat.</p>'; return; }
+    const entries = Object.entries(byTop).sort((a, b) => b[1] - a[1]);
+    const R = 15.9155; // Umfang = 100 -> dasharray direkt in Prozent
+    let offset = 25;   // Start oben (12 Uhr)
+    let segs = '', legend = '';
     entries.forEach(([id, cents]) => {
+      const cat = categoryById(id);
+      const color = cat ? cat.color : '#64748b';
+      const pct = (cents / totalExp) * 100;
+      segs += `<circle r="${R}" cx="18" cy="18" fill="none" stroke="${color}" stroke-width="4.6"`
+        + ` stroke-dasharray="${pct.toFixed(2)} ${(100 - pct).toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"></circle>`;
+      offset -= pct;
+      legend += `<div class="legrow"><span class="legdot" style="background:${color}"></span>`
+        + `<span class="legname">${escapeHtml((cat ? (cat.icon ? cat.icon + ' ' : '') + cat.name : 'Unbekannt'))}</span>`
+        + `<span class="legpct">${Math.round(pct)} %</span>`
+        + `<span class="legval">${Money.format(cents)}</span></div>`;
+    });
+    wrap.innerHTML = `<div class="donutbox"><svg viewBox="0 0 36 36" class="donut">${segs}`
+      + `<text x="18" y="17.2" class="donut__big">${Money.format(totalExp, { withSymbol: false })}</text>`
+      + `<text x="18" y="21.6" class="donut__small">€ Ausgaben</text></svg></div>`
+      + `<div class="legend">${legend}</div>`;
+  }
+
+  // Tagesbalken über den Monat.
+  function renderDailyBars(byDay, ym) {
+    const wrap = $('#statsDaily');
+    const values = Object.values(byDay);
+    if (values.length === 0) { wrap.innerHTML = '<p class="muted">Keine Ausgaben in diesem Monat.</p>'; return; }
+    const dim = parseInt(lastDayOfMonth(ym).slice(8, 10), 10);
+    const max = Math.max(...values);
+    let bars = '';
+    for (let d = 1; d <= dim; d++) {
+      const v = byDay[d] || 0;
+      bars += v
+        ? `<div class="dbar" style="height:${Math.max(5, Math.round((v / max) * 100))}%"></div>`
+        : '<div class="dbar is-zero"></div>';
+    }
+    wrap.innerHTML = `<div class="dbars">${bars}</div>`
+      + `<div class="dbars__axis"><span>1.</span><span>${Math.round(dim / 2)}.</span><span>${dim}.</span></div>`
+      + `<p class="muted">Höchster Tag: ${Money.format(max)}</p>`;
+  }
+
+  // Einnahmen vs. Ausgaben der letzten 6 Monate (bis zum gewählten Monat).
+  function renderTrend(ym) {
+    const wrap = $('#statsTrend');
+    const months = [];
+    for (let i = 5; i >= 0; i--) months.push(addMonths(ym, -i));
+    const data = months.map((m) => {
+      let inc = 0, exp = 0;
+      state.transactions.forEach((t) => {
+        if (monthKey(t.date) !== m) return;
+        if (t.type === 'income') inc += t.amountCents; else exp += t.amountCents;
+      });
+      return { m, inc, exp };
+    });
+    const max = Math.max(1, ...data.flatMap((d) => [d.inc, d.exp]));
+    wrap.innerHTML = data.map((d) => `
+      <div class="trendcol${d.m === ym ? ' is-current' : ''}">
+        <div class="trendbars">
+          <div class="tbar tbar--inc" style="height:${Math.round((d.inc / max) * 100)}%"></div>
+          <div class="tbar tbar--exp" style="height:${Math.round((d.exp / max) * 100)}%"></div>
+        </div>
+        <span class="trendlabel">${monthLabel(d.m, { month: 'short' })}</span>
+      </div>`).join('');
+  }
+
+  // Top-Kategorien (Blatt-Ebene) mit Balken.
+  function renderTopCats(byLeaf, exp) {
+    const wrap = $('#statsTopCats');
+    wrap.innerHTML = '';
+    const entries = Object.entries(byLeaf).sort((a, b) => b[1] - a[1]);
+    if (entries.length === 0) { wrap.innerHTML = '<p class="muted">Keine Ausgaben in diesem Monat.</p>'; return; }
+    entries.slice(0, 8).forEach(([id, cents]) => {
       const cat = categoryById(id);
       const pct = exp ? Math.round((cents / exp) * 100) : 0;
       const r = document.createElement('div');
@@ -435,6 +537,49 @@
         `<span class="statcat__val">${Money.format(cents)}</span>`;
       wrap.appendChild(r);
     });
+    if (entries.length > 8) {
+      const rest = entries.slice(8).reduce((s, [, c]) => s + c, 0);
+      const p = document.createElement('p');
+      p.className = 'muted';
+      p.textContent = `+ ${entries.length - 8} weitere (${Money.format(rest)})`;
+      wrap.appendChild(p);
+    }
+  }
+
+  // ---------- Prognose: Bestand in den nächsten 3 Monaten (wiederkehrend) ----------
+  function computeForecast(months = 3) {
+    const rules = state.recurring.filter((r) => r.active);
+    const rows = [];
+    let running = totalBalance();
+    let cursor = nextDay(todayISO());
+    const baseYm = monthKey(todayISO());
+    for (let i = 0; i < months; i++) {
+      const ym = addMonths(baseYm, i);
+      const end = lastDayOfMonth(ym);
+      let delta = 0;
+      for (let d = cursor; d <= end; d = nextDay(d)) {
+        for (const r of rules) {
+          if (d < r.startDate) continue;
+          if (r.endDate && d > r.endDate) continue;
+          if (isDue(r, d)) delta += r.type === 'income' ? r.amountCents : -r.amountCents;
+        }
+      }
+      running += delta;
+      rows.push({ ym, end: running, delta });
+      cursor = nextDay(end);
+    }
+    return rows;
+  }
+  function renderForecast() {
+    const wrap = $('#captureForecast');
+    if (!wrap) return;
+    if (!state.recurring.some((r) => r.active)) { wrap.hidden = true; return; }
+    wrap.hidden = false;
+    const rows = computeForecast();
+    wrap.innerHTML = '<div class="accsum__total"><span>Prognose (wiederkehrend)</span><span></span></div>'
+      + rows.map((r) => `<div class="accsum__row"><span>Ende ${monthLabel(r.ym, { month: 'short', year: 'numeric' })}</span>`
+        + `<span class="${r.end < 0 ? 'neg' : ''}">${Money.format(r.end)}`
+        + ` <small class="fc ${r.delta < 0 ? 'fc--neg' : 'fc--pos'}">${r.delta >= 0 ? '+' : '−'}${Money.format(Math.abs(r.delta), { withSymbol: false })}</small></span></div>`).join('');
   }
 
   function renderCategoryList() {
@@ -483,7 +628,6 @@
   }
 
   function renderMore() {
-    renderStats();
     renderCategoryList();
     renderRecurringList();
   }
@@ -921,6 +1065,7 @@
     $$('.view').forEach((v) => { v.hidden = v.dataset.view !== name; });
     $$('.tab').forEach((tb) => tb.classList.toggle('is-active', tb.dataset.goto === name));
     if (name === 'capture') renderAccountSummary();
+    if (name === 'stats') renderStatistics();
     if (name === 'accounts') renderAccounts();
     if (name === 'more') renderMore();
   }
@@ -938,6 +1083,14 @@
 
     // Konten / Transfer
     $('#transferSaveBtn').addEventListener('click', saveTransfer);
+
+    // Statistik: Monats-Navigation
+    $('#statsPrev').addEventListener('click', () => {
+      state.stats.month = addMonths(state.stats.month, -1); renderStatistics();
+    });
+    $('#statsNext').addEventListener('click', () => {
+      state.stats.month = addMonths(state.stats.month, 1); renderStatistics();
+    });
 
     // Eintrag-Overlay
     $('#editType').addEventListener('click', (e) => {
@@ -998,6 +1151,7 @@
     state.recurring = await DB.listRecurring();
 
     state.capture.accountId = defaultAccountId();
+    state.stats.month = monthKey(todayISO());
     $('#dateInput').value = todayISO();
     buildIntervalSelect();
     populateFilterCats();

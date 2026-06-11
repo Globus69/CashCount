@@ -148,3 +148,36 @@ Ebene-1-Kategorie mit Kindern klappt Ebene 2 auf.
 
 ### Offen / später
 - Ebene-2 für Einkauf-Kategorien, weitere Sonstiges-Einträge, Icon-Recolor (Rot/Orange).
+
+
+## Iteration 5 — Kompakt-Layout, Statistik & Prognose (umgesetzt 2026-06-11)
+
+Anforderungen (oben eingetragen) und Umsetzung:
+
+- [x] **Kompakter Kopfbereich**: Bestand als schmale Kopfzeile (Label links, Wert rechts,
+      26 px statt 42 px); Betragsfeld leicht verkleinert; Datum + Notiz in einer Zeile
+- [x] **Speichern immer sichtbar**: Button ist sticky am unteren Rand des Scrollbereichs
+      (über der Tabbar) — kein Scrollen mehr nötig, um zu speichern
+- [x] **Statistik-Seite** (neuer 5. Tab 📊):
+      - Monats-Navigation (‹ Monat ›, vor aktuellen Monat hinaus gesperrt)
+      - Kennzahlen-Karten: Einnahmen / Ausgaben / Saldo
+      - **Donut-Chart** „Ausgaben nach Bereich" (SVG; Ebene-2-Buchungen werden dem
+        Elternknoten zugerechnet, Farben aus den Kategorien, Legende mit % und Betrag)
+      - **Tagesbalken**: Ausgaben pro Tag über den Monat (mit Achse + höchster Tag)
+      - **6-Monats-Trend**: Einnahmen vs. Ausgaben als Balkenpaare
+      - **Top-Kategorien** (Blatt-Ebene, Top 8 + Rest-Summe)
+      - Monatsübersicht aus „Mehr" hierher umgezogen
+- [x] **3-Monats-Prognose** auf der Eingabeseite: projizierter Gesamtbestand zum Ende der
+      nächsten drei Monate aus den aktiven wiederkehrenden Regeln (inkl. Monats-Delta);
+      ausgeblendet, wenn keine aktive Regel existiert
+- [x] Service-Worker v8
+
+Original-Anforderungen:
+
+- Im oberen Bereich des Bildschirms muss der Anfangsbestand und Der eingegebene Wert Platzsparender angeordnet werden, Gegebenenfalls nebeneinander und in der Größe differenziert.
+
+- Der Bildschirm muss so strukturiert werden dass der Speicher Button zu jederzeit sichtbar ist wenn Ein Betrag eingegeben wurde es darf nicht sein dass gescrollt werden muss um speichern zu können.
+
+- Sei kreativ und mach mir auch noch mal eine Seite mit statistischen Auswertungen in den übersichtlich und besten und schönsten Wägen die du findest und für dich erdenken kannst.
+
+- Gib in einer separaten Anzeige auf dem Display bei der Eingabe unter oder neben oder wie auch immer angeordnet, Eine Vorschau auf die nächsten drei Monate wie sich anhand der wiederkehrenden Einnahmen und Außenabgaben Der Kontobestand entwickeln wird.

@@ -22,16 +22,17 @@ html, body {
 }
 body { display: flex; flex-direction: column; min-height: 100dvh; }
 
-/* Bestand */
+/* Bestand — kompakte Kopfzeile (Label links, Wert rechts) */
 .balance {
-  padding: calc(var(--safe-top) + 16px) 16px 18px;
-  text-align: center;
+  padding: calc(var(--safe-top) + 10px) 16px 10px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
   background: linear-gradient(180deg, var(--accent), transparent);
 }
-.balance__label { display: block; font-size: 14px; color: rgba(255,255,255,.8); }
-.balance__value { display: block; font-size: 42px; font-weight: 700; letter-spacing: -.5px; }
+.balance__left { display: flex; flex-direction: column; min-width: 0; }
+.balance__label { font-size: 13px; color: rgba(255,255,255,.85); }
+.balance__value { font-size: 26px; font-weight: 700; letter-spacing: -.5px; white-space: nowrap; }
 .balance__value.is-negative { color: var(--expense); }
-.balance__sub { display: block; font-size: 12px; color: rgba(255,255,255,.6); margin-top: 2px; }
+.balance__sub { font-size: 11px; color: rgba(255,255,255,.6); }
 
 main { flex: 1; overflow-y: auto; padding: 16px; }
 .view[hidden] { display: none; }
@@ -46,10 +47,10 @@ main { flex: 1; overflow-y: auto; padding: 16px; }
 }
 .amount__input {
   background: transparent; border: 0; color: var(--text);
-  font-size: 44px; font-weight: 700; text-align: right; width: 100%;
+  font-size: 36px; font-weight: 700; text-align: right; width: 100%;
   outline: none; min-width: 0;
 }
-.amount__cur { font-size: 32px; color: var(--muted); padding-left: 8px; }
+.amount__cur { font-size: 26px; color: var(--muted); padding-left: 8px; }
 .amount--sm .amount__input { font-size: 32px; }
 .amount__clear {
   flex: 0 0 auto; margin-left: 8px; width: 40px; height: 40px;
@@ -111,6 +112,58 @@ main { flex: 1; overflow-y: auto; padding: 16px; }
 .accsum__row { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
 .accsum__row .neg { color: var(--expense); }
 
+/* Prognose auf der Eingabeseite */
+.accsum--forecast .accsum__total { color: var(--muted); font-size: 13px; }
+.fc { font-size: 11px; font-weight: 600; }
+.fc--pos { color: var(--income); }
+.fc--neg { color: var(--expense); }
+
+/* Statistik-Seite */
+.monthnav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.monthnav h2 { margin: 0; font-size: 18px; }
+.monthnav .btn--sm { min-width: 52px; font-size: 20px; }
+.btn:disabled { opacity: .35; }
+
+.statgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.statcard {
+  background: var(--surface); border-radius: 12px; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+}
+.statcard__label { font-size: 11px; color: var(--muted); }
+.statcard__val { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.statcard__val.pos { color: var(--income); }
+.statcard__val.neg { color: var(--expense); }
+
+/* Donut (SVG, dasharray in Prozent) */
+.donutbox { display: flex; justify-content: center; }
+.donut { width: 180px; height: 180px; }
+.donut__big { font-size: 5px; font-weight: 700; fill: var(--text); text-anchor: middle; }
+.donut__small { font-size: 2.6px; fill: var(--muted); text-anchor: middle; }
+.legend { margin-top: 14px; display: flex; flex-direction: column; gap: 7px; }
+.legrow { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.legdot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: 0 0 10px; }
+.legname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.legpct { color: var(--muted); font-size: 13px; width: 42px; text-align: right; }
+.legval { font-size: 13px; width: 84px; text-align: right; }
+
+/* Tagesbalken */
+.dbars { display: flex; align-items: flex-end; gap: 2px; height: 90px; }
+.dbar { flex: 1; background: var(--accent); border-radius: 2px 2px 0 0; }
+.dbar.is-zero { height: 2px; background: #243152; }
+.dbars__axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* 6-Monats-Trend */
+.trend { display: flex; gap: 8px; height: 120px; align-items: flex-end; }
+.trendcol { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; }
+.trendbars { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
+.tbar { width: 12px; border-radius: 3px 3px 0 0; min-height: 2px; }
+.tbar--inc { background: var(--income); }
+.tbar--exp { background: var(--expense); }
+.trendlabel { font-size: 11px; color: var(--muted); }
+.trendcol.is-current .trendlabel { color: var(--text); font-weight: 700; }
+.trendlegend { display: flex; gap: 16px; margin-top: 10px; font-size: 12px; color: var(--muted); align-items: center; }
+.trendlegend .legdot { margin-right: 4px; }
+
 /* Konten-Übersicht & Anfangsbestände */
 .accov { display: flex; flex-direction: column; }
 .startrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -144,12 +197,18 @@ main { flex: 1; overflow-y: auto; padding: 16px; }
   color: var(--text); font-size: 16px; outline: none;
 }
 input[type="date"].field { color-scheme: dark; }
+.field--date { flex: 0 0 44%; }
 
 .save {
   min-height: var(--tap); border: 0; border-radius: 14px;
   background: var(--accent); color: #fff; font-size: 18px; font-weight: 700;
 }
 .save--inline { flex: 1; }
+/* Speichern bleibt beim Scrollen im Sichtfeld (über der Tabbar) */
+.save--sticky {
+  position: sticky; bottom: 8px; z-index: 5;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .5);
+}
 
 .toast {
   position: fixed; left: 16px; right: 16px;

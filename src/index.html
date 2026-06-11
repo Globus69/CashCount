@@ -13,11 +13,13 @@
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <!-- Bestand (Summe aller Konten) -->
+  <!-- Bestand (Summe aller Konten) — kompakte Kopfzeile -->
   <header class="balance" id="balance">
-    <span class="balance__label">Bestand gesamt</span>
+    <span class="balance__left">
+      <span class="balance__label">Bestand gesamt</span>
+      <span class="balance__sub" id="balanceSub"></span>
+    </span>
     <span class="balance__value" id="balanceValue">–</span>
-    <span class="balance__sub" id="balanceSub"></span>
   </header>
 
   <main id="views">
@@ -45,16 +47,18 @@
         <div class="acctpick" id="captureAccounts" aria-label="Konto"></div>
 
         <div class="row">
-          <input type="date" id="dateInput" class="field" aria-label="Datum">
-        </div>
-        <div class="row">
+          <input type="date" id="dateInput" class="field field--date" aria-label="Datum">
           <input type="text" id="noteInput" class="field" placeholder="Notiz (optional)">
         </div>
 
-        <button type="submit" class="save" id="saveBtn">Speichern</button>
+        <!-- bleibt beim Scrollen immer sichtbar -->
+        <button type="submit" class="save save--sticky" id="saveBtn">Speichern</button>
 
         <!-- Kleine Konten-Summe -->
         <div class="accsum" id="captureAccSum"></div>
+
+        <!-- Prognose: Bestandsentwicklung aus wiederkehrenden Einträgen -->
+        <div class="accsum accsum--forecast" id="captureForecast" hidden></div>
       </form>
     </section>
 
@@ -72,6 +76,45 @@
         </div>
       </div>
       <div id="historyList"></div>
+    </section>
+
+    <!-- STATISTIK -->
+    <section class="view" data-view="stats" hidden>
+      <div class="monthnav">
+        <button type="button" class="btn btn--sm" id="statsPrev" aria-label="Voriger Monat">‹</button>
+        <h2 id="statsMonthLabel"></h2>
+        <button type="button" class="btn btn--sm" id="statsNext" aria-label="Nächster Monat">›</button>
+      </div>
+
+      <div class="statgrid">
+        <div class="statcard"><span class="statcard__label">Einnahmen</span><span class="statcard__val pos" id="statsIncome">–</span></div>
+        <div class="statcard"><span class="statcard__label">Ausgaben</span><span class="statcard__val neg" id="statsExpense">–</span></div>
+        <div class="statcard"><span class="statcard__label">Saldo</span><span class="statcard__val" id="statsNet">–</span></div>
+      </div>
+
+      <div class="card">
+        <h2>Ausgaben nach Bereich</h2>
+        <div id="statsDonut"></div>
+      </div>
+
+      <div class="card">
+        <h2>Ausgaben pro Tag</h2>
+        <div id="statsDaily"></div>
+      </div>
+
+      <div class="card">
+        <h2>6-Monats-Trend</h2>
+        <div class="trend" id="statsTrend"></div>
+        <div class="trendlegend">
+          <span><i class="legdot" style="background:var(--income)"></i> Einnahmen</span>
+          <span><i class="legdot" style="background:var(--expense)"></i> Ausgaben</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Top-Kategorien</h2>
+        <div id="statsTopCats" class="statcats"></div>
+      </div>
     </section>
 
     <!-- KONTEN -->
@@ -116,14 +159,6 @@
     <!-- MEHR -->
     <section class="view" data-view="more" hidden>
       <div class="card">
-        <h2>Übersicht — <span id="statMonth"></span></h2>
-        <div class="statrow"><span>Einnahmen</span><span class="pos" id="statIncome">–</span></div>
-        <div class="statrow"><span>Ausgaben</span><span class="neg" id="statExpense">–</span></div>
-        <div class="statrow statrow--total"><span>Saldo Monat</span><span id="statNet">–</span></div>
-        <div id="statByCat" class="statcats"></div>
-      </div>
-
-      <div class="card">
         <div class="card__head">
           <h2>Kategorien</h2>
           <button type="button" class="btn btn--sm" id="addCatBtn">+ Neu</button>
@@ -160,6 +195,7 @@
   <nav class="tabbar">
     <button class="tab is-active" data-goto="capture">➕<span>Erfassen</span></button>
     <button class="tab" data-goto="history">📒<span>Verlauf</span></button>
+    <button class="tab" data-goto="stats">📊<span>Statistik</span></button>
     <button class="tab" data-goto="accounts">🏦<span>Konten</span></button>
     <button class="tab" data-goto="more">⚙️<span>Mehr</span></button>
   </nav>
